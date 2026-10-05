@@ -89,24 +89,24 @@
 
 **Independent Test**: arrancar el contenedor con variables válidas e inválidas, enviarle SIGTERM durante el procesamiento y revisar los logs.
 
-- [ ] T035 [P] [US4] Test `tests/unit/test_worker_main.py`: variables faltantes → exit 78 y mensaje que nombra las variables sin valores; `--help`/argumentos.
-- [ ] T036 [P] [US4] Test de integración `tests/integration/test_worker_senales.py`: SIGTERM real sobre un subproceso con mensajes en curso; termina en < 30 s, no toma otro mensaje, no pierde ni duplica notificaciones, y emite el resumen final.
-- [ ] T037 [US4] Apagado ordenado en `__main__.py` y `consumidor.py`: `threading.Event`, terminar o devolver el mensaje en curso (incluidos los retenidos por el corte), cerrar conexiones, plazo `SHUTDOWN_TIMEOUT_S`. Hace pasar T035 y T036.
-- [ ] T038 [P] [US4] Test `tests/integration/test_worker_pii_logs.py` (SC-007): una corrida completa con fallos de todos los tipos no deja emails, nombres, claves ni URL de RabbitMQ en los logs.
-- [ ] T039 [US4] Logs estructurados por mensaje (`message_id`, `corrida_id`, `modulo`, `resultado`, `motivo`) y resumen periódico (`SUMMARY_INTERVAL_S`) y final con contadores y mensajes pendientes en la cola (consulta pasiva con `queue_declare(passive=True)`). Hace pasar T038.
-- [ ] T040 [US4] `docker/worker/Dockerfile`: `python:3.12-slim`, usuario no root, `ENTRYPOINT ["python","-m","recos_auto.worker"]` (PID 1 recibe las señales), sin puertos ni volúmenes.
-- [ ] T041 [US4] `docker-compose.yml`: agregar el servicio `worker` y un servicio auxiliar que declara la cola `notificaciones` (reemplaza a Recome-Recos-Notificaciones en el entorno local); `stop_grace_period: 30s`.
-- [ ] T042 [P] [US4] Test `tests/integration/test_worker_contenedor.py` (marcador `contenedor`): construir la imagen; sin variables → exit 78; con variables válidas procesa mensajes; `docker stop` termina en < 30 s.
-- [ ] T043 [US4] Actualizar `README.md` con el worker (ejecución, variables, interruptor, comandos de prueba).
+- [X] T035 [P] [US4] Test `tests/unit/test_worker_main.py`: variables faltantes → exit 78 y mensaje que nombra las variables sin valores; `--help`/argumentos.
+- [X] T036 [P] [US4] Test de integración `tests/integration/test_worker_senales.py`: SIGTERM real sobre un subproceso con mensajes en curso; termina en < 30 s, no toma otro mensaje, no pierde ni duplica notificaciones, y emite el resumen final.
+- [X] T037 [US4] Apagado ordenado en `__main__.py` y `consumidor.py`: `threading.Event`, terminar o devolver el mensaje en curso (incluidos los retenidos por el corte), cerrar conexiones, plazo `SHUTDOWN_TIMEOUT_S`. Hace pasar T035 y T036.
+- [X] T038 [P] [US4] Test `tests/integration/test_worker_pii_logs.py` (SC-007): una corrida completa con fallos de todos los tipos no deja emails, nombres, claves ni URL de RabbitMQ en los logs.
+- [X] T039 [US4] Logs estructurados por mensaje (`message_id`, `corrida_id`, `modulo`, `resultado`, `motivo`) y resumen periódico (`SUMMARY_INTERVAL_S`) y final con contadores y mensajes pendientes en la cola (consulta pasiva con `queue_declare(passive=True)`). Hace pasar T038.
+- [X] T040 [US4] `docker/worker/Dockerfile`: `python:3.12-slim`, usuario no root, `ENTRYPOINT ["python","-m","recos_auto.worker"]` (PID 1 recibe las señales), sin puertos ni volúmenes.
+- [X] T041 [US4] `docker-compose.yml`: agregar el servicio `worker` y un servicio auxiliar que declara la cola `notificaciones` (reemplaza a Recome-Recos-Notificaciones en el entorno local); `stop_grace_period: 30s`.
+- [X] T042 [P] [US4] Test `tests/integration/test_worker_contenedor.py` (marcador `contenedor`): construir la imagen; sin variables → exit 78; con variables válidas procesa mensajes; `docker stop` termina en < 30 s.
+- [X] T043 [US4] Actualizar `README.md` con el worker (ejecución, variables, interruptor, comandos de prueba).
 
 ---
 
 ## Phase 7: Polish y verificación transversal
 
-- [ ] T044 Ejecutar `ruff check` y `ruff format`; toda la suite (`pytest -q`) incluyendo las pruebas del cron.
+- [X] T044 Ejecutar `ruff check` y `ruff format`; toda la suite (`pytest -q`) incluyendo las pruebas del cron.
 - [ ] T045 Ejecutar el flujo de `quickstart.md` (secciones 1 a 3) y registrar los resultados.
 - [ ] T046 Verificar SC-003, FR-014 y FR-021 con un test transversal `tests/integration/test_worker_invariantes.py`: con todos los modos de fallo activos, (a) la cola de salida recibe 0 mensajes de error o parciales (SC-003); (b) el worker no escribe archivos fuera de `/tmp` durante la corrida y no deja datos de usuario en disco (FR-014); (c) notificados + sin recomendación + inválidos + reintentados es igual a los recibidos, es decir, ningún mensaje se pierde en silencio (FR-021).
-- [ ] T047 Verificar que `common/topology.py` sigue dando los mismos argumentos que usa el cron (tests de la feature 001 en verde) y que el worker no declara nunca la cola de salida.
+- [X] T047 Verificar que `common/topology.py` sigue dando los mismos argumentos que usa el cron (tests de la feature 001 en verde) y que el worker no declara nunca la cola de salida.
 - [ ] T048 Actualizar `research.md` y `spec.md` con lo aprendido (por ejemplo, la latencia tolerable medida en T034 y el comportamiento real del `consumer_timeout`).
 - [ ] T049 Confirmar el contrato con api-general y con Notificaciones cuando estén disponibles (rama sin mergear, nombre de la cola de salida, versión de RabbitMQ) y anotar las diferencias.
 
