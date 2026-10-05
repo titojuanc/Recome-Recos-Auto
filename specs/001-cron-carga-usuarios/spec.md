@@ -13,6 +13,10 @@
 - Q: ¿Qué pasa con los mensajes que quedan mucho tiempo en la cola? → A: Si pasan más de 2 horas en la cola, se descartan (TTL de 2 h; van a la dead-letter). Revierte la decisión anterior de no descartar por antigüedad.
 - Q: ¿Qué pasa con los mensajes de la dead-letter? → A: La dead-letter también tiene TTL (7 días) y se vacía sola.
 - Q: ¿Cuándo se fijan la fecha y el módulo de una corrida? → A: Una sola vez al iniciar la corrida (UTC-3); no cambian aunque cruce la medianoche.
+- Q: ¿Cómo se trata el riesgo de que el worker no procese a todos en 2 h? → A: Se agrega SC-009 a esta feature (verificable por completo con el worker); el TTL sigue configurable.
+- Q: ¿Qué versión de RabbitMQ se asume? → A: 3.10 o superior (probado en 3.13.7); se confirma contra el RabbitMQ real.
+- Q: ¿Cómo se prueba el descarte a las 2 h? → A: Con un TTL corto (p. ej. 2 s) por variable de entorno en el test de integración; el valor de producción (2 h) se valida leyendo los argumentos de la cola declarada.
+- Q: ¿Quién garantiza que el worker declare la cola con los mismos TTL? → A: El worker reutiliza `common/topology.py` y un test de contrato verifica la coincidencia; queda como requisito de la feature 002.
 - Q: ¿Cómo se entera alguien de que una corrida falló o no corrió? → A: Solo por logs y código de salida, con revisión manual; la alerta automática queda para cuando exista Dokploy.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -120,7 +124,7 @@ Quien opera el sistema puede desplegar el cron como contenedor en Dokploy usando
 - **FR-009**: El sistema MUST determinar el módulo de forma determinística a partir de la fecha de corrida, alternando día por medio entre `peliculas` y `juegos` desde una fecha de referencia configurable, sin guardar estado entre corridas. Todos los mensajes de una corrida MUST llevar el mismo módulo: la fecha de corrida (UTC-3) y el módulo se fijan una sola vez al iniciar la corrida y no cambian aunque la corrida cruce la medianoche.
 - **FR-010**: El sistema MUST publicar los mensajes de forma persistente y con confirmación de recepción del broker, reintentando de forma acotada los no confirmados y contando los que fallen definitivamente.
 - **FR-012**: Los mensajes de una misma combinación (usuario, fecha, módulo) MUST tener la misma identidad entre corridas y reejecuciones, para que el consumidor pueda detectar duplicados.
-- **FR-013**: El sistema MUST declarar de forma idempotente la cola de usuarios (`recos-auto.usuarios`) y su dead-letter (`recos-auto.usuarios.dead-letter`) con la convención de Notificaciones (durables, mensajes persistentes, límite de entregas de 5, dead-letter), idéntica a la declaración del worker; si la cola ya existe con parámetros distintos, la corrida MUST fallar con error claro.
+- **FR-013**: El sistema MUST declarar de forma idempotente la cola de usuarios (`recos-auto.usuarios`) y su dead-letter (`recos-auto.usuarios.dead-letter`) con la convención de Notificaciones (durables, mensajes persistentes, límite de entregas de 5, dead-letter), idéntica a la declaración del worker (el worker MUST reutilizar el mismo módulo de topología de este repositorio, y un test de contrato verifica que los argumentos coinciden); si la cola ya existe con parámetros distintos, la corrida MUST fallar con error claro.
 - **FR-014**: Todo mensaje que permanezca más de 2 horas en la cola de usuarios MUST descartarse (TTL de 2 h = 7.200.000 ms, configurable, mismo valor que declare el worker). Un mensaje vencido no se procesa ni se reenvía; al vencer pasa a la dead-letter (`recos-auto.usuarios.dead-letter`) para poder auditarlo. La dead-letter también tiene TTL (7 días = 604.800.000 ms, configurable, igual en cron y worker) para que no acumule datos personales indefinidamente. Los mensajes pendientes menores a 2 h se mantienen y se procesan cuando les toque.
 
 **Resultado, errores y observabilidad**
@@ -159,12 +163,13 @@ Quien opera el sistema puede desplegar el cron como contenedor en Dokploy usando
 - **SC-006**: Un operador puede desplegar el contenedor y lanzar una corrida manual siguiendo solo la documentación, en menos de 30 minutos.
 - **SC-007**: Ningún log de una corrida contiene emails, nombres ni claves (verificado con una corrida de prueba y búsqueda de esos valores en la salida).
 - **SC-008**: 0 notificaciones se envían directamente desde este cron.
+- **SC-009**: Cada usuario encolado en una corrida se procesa (se consume su mensaje) dentro de las 2 horas de su publicación; de lo contrario vence y va a la dead-letter. Este criterio se verifica con el worker (feature 002); desde esta feature se puede comprobar solo que el cron publica los mensajes con el TTL de 2 h y que un mensaje vencido llega a la dead-letter. Si el worker no alcanza, el TTL se sube por variable de entorno (`RABBITMQ_USERS_MESSAGE_TTL_MS`).
 
 ## Assumptions
 
 - api-general expone `GET /internal/v1/notification-targets` (implementado en la rama `feature/recos-auto-usuarios-contacto` de recome-api-general, pendiente de merge). La corrida real requiere ese merge y su despliegue.
 - La clave de servicio (`X-Internal-API-Key`) la provee quien administra api-general y se configura por variable de entorno.
-- El RabbitMQ es el existente del sistema y lo administra el equipo. Los nombres de cola se confirman contra el RabbitMQ real.
+- El RabbitMQ es el existente del sistema y lo administra el equipo. Se asume RabbitMQ 3.10 o superior (probado en 3.13.7), necesario para el TTL con dead-letter en colas quorum; se confirma junto con los nombres de cola. Los nombres de cola se confirman contra el RabbitMQ real.
 - El día de `peliculas` por defecto es el 2026-10-05 (lunes); es configurable. Desde esa fecha se alterna día por medio.
 - La cola de usuarios descarta los mensajes con más de 2 horas (TTL por defecto de 2 h); el worker debe declarar el mismo TTL, porque una cola con otros argumentos falla con `PRECONDITION_FAILED`. El valor es configurable. La dead-letter retiene los mensajes 7 días y los elimina sola.
 - Escala esperada: hasta decenas de miles de usuarios; no se requiere paralelismo en el cron en esta versión.
