@@ -22,7 +22,7 @@
 
 ## Phase 2: Foundational (bloquea todas las historias)
 
-- [ ] T004 [P] Test `tests/unit/test_worker_config.py`: obligatorias faltantes se listan todas sin valores; inválidas (concurrencia < 1, plantillas con llaves desconocidas, números negativos) se nombran; defaults de `contracts/entorno.md`; `repr` sin secretos.
+- [ ] T004 [P] Test `tests/unit/test_worker_config.py`: obligatorias faltantes se listan todas sin valores; inválidas (concurrencia < 1, `BREAKER_FAILURES` negativo, `BREAKER_MAX_HOLD_S` ≥ 1800, plantillas con llaves desconocidas, números negativos) se nombran; defaults de `contracts/entorno.md`; `repr` sin secretos.
 - [ ] T005 `src/recos_auto/worker/config.py`: `ConfigWorker.from_env` (reutiliza `ConfigError`); mover a `common/config.py` las constantes de cola, TTL y `delivery_limit` compartidas con el cron. Hace pasar T004.
 - [ ] T006 [P] Test de contrato `tests/contract/test_topologia_worker.py` (FR-012): `ConfigWorker` y la `Config` del cron producen `argumentos_cola_usuarios` y `argumentos_dead_letter` idénticos; con RabbitMQ real, declarar desde ambos es idempotente y no da `PRECONDITION_FAILED`.
 - [ ] T007 `src/recos_auto/common/topology.py`: tipar el parámetro con un `Protocol` (`users_queue`, `dead_letter_queue`, `dead_letter_exchange`, `delivery_limit`, `users_message_ttl_ms`, `dead_letter_ttl_ms`) sin cambiar su comportamiento. Los tests de la feature 001 deben seguir en verde. Hace pasar T006.
@@ -31,7 +31,7 @@
 - [ ] T010 [P] Test de contrato `tests/contract/test_schema_notificacion.py`: toda `Notificacion` generada valida contra `specs/002-worker-recomendaciones/contracts/mensaje-notificacion.schema.json`; los casos inválidos (sin mail, canal distinto) lo incumplen.
 - [ ] T011 [P] Test `tests/unit/test_contadores.py`: incrementos concurrentes desde varios hilos, resumen con todos los campos, sin datos personales.
 - [ ] T012 `src/recos_auto/worker/contadores.py`: contadores con lock y `resumen()`. Hace pasar T011.
-- [ ] T013 [P] Test `tests/unit/test_recomendaciones.py` y `tests/contract/test_api_recomendacion_contract.py` (con `httpx.MockTransport`): URL, parámetro `module`, header `X-Internal-API-Key`; respuesta 200 válida; clasificación por código (404/412 → sin recomendación; 400 → inválido; 401/403/429/5xx/timeout/red → transitorio); título vacío → sin recomendación; la clave nunca aparece en excepciones ni logs; sin reintentos propios.
+- [ ] T013 [P] Test `tests/unit/test_recomendaciones.py` y `tests/contract/test_api_recomendacion_contract.py` (con `httpx.MockTransport`): URL, parámetro `module`, header `X-Internal-API-Key`; respuesta 200 válida; clasificación por código (404/412 → sin recomendación; 400 → inválido; 401/403/429/5xx/timeout/red → transitorio); título vacío → sin recomendación; `recommendation_id` o `module` de la respuesta distintos de los pedidos → inválido (FR-025); la clave nunca aparece en excepciones ni logs; sin reintentos propios.
 - [ ] T014 `src/recos_auto/worker/recomendaciones.py`: cliente de api-general que devuelve un `Resultado` tipado (`Recomendacion` o error clasificado). Hace pasar T013.
 
 **Checkpoint**: base lista (config, topología compartida, notificación, contadores, cliente).
@@ -42,7 +42,7 @@
 
 **Independent Test**: N mensajes de usuario en la cola + api simulada + RabbitMQ real → N notificaciones válidas en la cola de salida y la cola de usuarios vacía.
 
-- [ ] T015 [P] [US1] Test `tests/unit/test_procesador.py` (camino feliz): dado un mensaje válido y una recomendación, devuelve `NOTIFICADO` con la notificación correcta para `peliculas` y para `juegos`; el mismo mensaje procesado dos veces produce el mismo `id_mensaje`.
+- [ ] T015 [P] [US1] Test `tests/unit/test_procesador.py` (camino feliz): dado un mensaje válido y una recomendación, devuelve `NOTIFICADO` con la notificación correcta para `peliculas` y para `juegos`; el mismo mensaje procesado dos veces produce el mismo `id_mensaje`; `mail` y `destinatario` salen del mismo mensaje y la recomendación se pide con su `recommendation_id` (FR-025).
 - [ ] T016 [US1] `src/recos_auto/worker/procesador.py`: lógica pura mensaje → `Resultado` (sin pika). Hace pasar T015.
 - [ ] T017 [P] [US1] Test `tests/unit/test_worker_publicador.py` y `tests/contract/test_publicacion_notificaciones.py` (RabbitMQ real): publica en el exchange por defecto con routing key = cola de salida, `mandatory`, `delivery_mode=2`, confirms; NO declara la cola de salida; cola inexistente → error transitorio detectable (`UnroutableError`).
 - [ ] T018 [US1] `src/recos_auto/worker/publicador.py`: publicación con confirms, `mandatory` y timeout de confirm. Hace pasar T017.
@@ -62,7 +62,7 @@
 - [ ] T023 [US2] Completar `procesador.py` con la clasificación. Hace pasar T022.
 - [ ] T024 [P] [US2] Test `tests/unit/test_interruptor.py` con reloj inyectable: abre tras N fallos consecutivos; un éxito reinicia el contador; espera creciente con tope; `SEMIABIERTO` deja pasar una sola prueba; cierra al éxito y reabre con mayor espera al fallo; seguro entre hilos.
 - [ ] T025 [US2] `src/recos_auto/worker/interruptor.py`. Hace pasar T024.
-- [ ] T026 [P] [US2] Test de integración `tests/integration/test_worker_fallos.py`: 404 y 412 → cola de salida vacía, mensaje confirmado, motivo en logs; 503 persistente (con interruptor deshabilitado por config) → 6 entregas y luego dead-letter; mensaje inválido → dead-letter directo sin reintentos; cola de salida inexistente → reintento y nunca `ack` sin publicar.
+- [ ] T026 [P] [US2] Test de integración `tests/integration/test_worker_fallos.py`: 404 y 412 → cola de salida vacía, mensaje confirmado, motivo en logs; 503 persistente (con `BREAKER_FAILURES=0`, que deshabilita el interruptor) → 6 entregas y luego dead-letter; mensaje inválido → dead-letter directo sin reintentos; cola de salida inexistente → reintento y nunca `ack` sin publicar.
 - [ ] T027 [US2] Completar `consumidor.py`: `ack` para `NOTIFICADO` y `SIN_RECOMENDACION`, `nack(requeue=False)` para `INVALIDO`, `nack(requeue=True)` para `TRANSITORIO`. Hace pasar T026.
 - [ ] T028 [P] [US2] Test de integración `tests/integration/test_worker_corte.py` (SC-009, tiempos reducidos): con api caída y mensajes en cola, el worker registra `corte_abierto`, ningún mensaje llega a dead-letter y el `x-delivery-count` no crece; al volver la api registra `corte_cerrado` y procesa todo; un mensaje retenido más de `BREAKER_MAX_HOLD_S` se devuelve a la cola.
 - [ ] T029 [US2] Integrar el interruptor en `consumidor.py`: retención sin confirmar del mensaje en curso, `process_data_events()` para sostener heartbeats durante la espera, tope de retención, reanudación con un único mensaje de prueba. Hace pasar T028.
@@ -77,7 +77,7 @@
 
 **Independent Test**: 10 000 mensajes con una api simulada de latencia realista se vacían en menos de 2 h con una instancia.
 
-- [ ] T032 [P] [US3] Test de integración `tests/integration/test_worker_concurrencia.py`: con `WORKER_CONCURRENCY=4` y 200 mensajes, cada mensaje se publica exactamente una vez, hay 4 conexiones distintas, el fallo de un mensaje no afecta a los demás en curso y los contadores suman lo recibido; con `WORKER_CONCURRENCY=1` el comportamiento es secuencial. Además: el worker no consume la dead-letter.
+- [ ] T032 [P] [US3] Test de integración `tests/integration/test_worker_concurrencia.py`: con `WORKER_CONCURRENCY=4` y 200 mensajes, cada mensaje se publica exactamente una vez, hay 4 conexiones distintas, el fallo de un mensaje no afecta a los demás en curso, los contadores suman lo recibido y la api simulada devuelve un título único por `recommendation_id`: cada notificación lleva el mail y el destinatario del usuario cuyo título contiene, 0 cruces (SC-010, FR-025); con `WORKER_CONCURRENCY=1` el comportamiento es secuencial. Además: el worker no consume la dead-letter.
 - [ ] T033 [US3] `__main__.py`: lanzar `WORKER_CONCURRENCY` hilos, cada uno con su conexión, canal y cliente HTTP; el interruptor y los contadores se comparten. Hace pasar T032.
 - [ ] T034 [P] [US3] Test de rendimiento `tests/integration/test_worker_rendimiento.py` (marcador `lento`): 10 000 mensajes con latencia simulada de la api; todos procesados en menos de 2 h (SC-005) y 0 duplicados. Anotar en el reporte la latencia máxima tolerable por llamada.
 
@@ -93,7 +93,7 @@
 - [ ] T036 [P] [US4] Test de integración `tests/integration/test_worker_senales.py`: SIGTERM real sobre un subproceso con mensajes en curso; termina en < 30 s, no toma otro mensaje, no pierde ni duplica notificaciones, y emite el resumen final.
 - [ ] T037 [US4] Apagado ordenado en `__main__.py` y `consumidor.py`: `threading.Event`, terminar o devolver el mensaje en curso (incluidos los retenidos por el corte), cerrar conexiones, plazo `SHUTDOWN_TIMEOUT_S`. Hace pasar T035 y T036.
 - [ ] T038 [P] [US4] Test `tests/integration/test_worker_pii_logs.py` (SC-007): una corrida completa con fallos de todos los tipos no deja emails, nombres, claves ni URL de RabbitMQ en los logs.
-- [ ] T039 [US4] Logs estructurados por mensaje (`message_id`, `corrida_id`, `modulo`, `resultado`, `motivo`) y resumen periódico (`SUMMARY_INTERVAL_S`) y final con contadores. Hace pasar T038.
+- [ ] T039 [US4] Logs estructurados por mensaje (`message_id`, `corrida_id`, `modulo`, `resultado`, `motivo`) y resumen periódico (`SUMMARY_INTERVAL_S`) y final con contadores y mensajes pendientes en la cola (consulta pasiva con `queue_declare(passive=True)`). Hace pasar T038.
 - [ ] T040 [US4] `docker/worker/Dockerfile`: `python:3.12-slim`, usuario no root, `ENTRYPOINT ["python","-m","recos_auto.worker"]` (PID 1 recibe las señales), sin puertos ni volúmenes.
 - [ ] T041 [US4] `docker-compose.yml`: agregar el servicio `worker` y un servicio auxiliar que declara la cola `notificaciones` (reemplaza a Recome-Recos-Notificaciones en el entorno local); `stop_grace_period: 30s`.
 - [ ] T042 [P] [US4] Test `tests/integration/test_worker_contenedor.py` (marcador `contenedor`): construir la imagen; sin variables → exit 78; con variables válidas procesa mensajes; `docker stop` termina en < 30 s.

@@ -15,7 +15,12 @@
 ## D3. Interruptor de corte (clarificación 5)
 - **Decisión**: estado compartido con lock: `cerrado` → `abierto` tras `BREAKER_FAILURES` (5) fallos transitorios **consecutivos** (el éxito reinicia el contador). Abierto: ningún hilo toma ni procesa mensajes; espera creciente `BREAKER_BACKOFF_S` (5 s, ×2, tope 60 s). Pasada la espera pasa a `semiabierto`: un solo hilo prueba con un mensaje; si tiene éxito se cierra, si falla se reabre con más espera.
 - **Retención sin confirmar**: un mensaje entregado a un hilo cuando el corte abre se **retiene sin `ack` ni `nack`** y se reintenta en el lugar al reanudar. Retener no incrementa el `delivery-count` de la quorum queue; solo lo hace un `nack(requeue)`. Así se cumple SC-009. Mientras espera, el hilo llama `connection.process_data_events()` para sostener los heartbeats.
-- **Límite**: el `consumer_timeout` de las quorum queues (por defecto 30 min en RabbitMQ 3.8.15+) cierra el canal si un mensaje queda sin confirmar más de ese tiempo. La retención máxima por mensaje se acota a `BREAKER_MAX_HOLD_S` (por defecto 600 s); superado, se hace `nack(requeue)` normal.
+- **Límite**: el `consumer_timeout` de las quorum queues (por defecto 30 min en RabbitMQ 3.8.15+) cierra el canal si un mensaje queda sin confirmar más de ese tiempo. La retención máxima por mensaje se acota a `BREAKER_MAX_HOLD_S` (por defecto 1500 s, validado < 1800 s); superado, se hace `nack(requeue)` normal.
+- **Verificado (RabbitMQ 3.13, pika 1.4.4, quorum queue con `x-delivery-limit=5`, 2026-10-05)**:
+  - Retener un mensaje 40 s sin `ack` ni `nack`, con `process_data_events()` sosteniendo los heartbeats: **no** incrementa `x-delivery-count` (el header ni aparece en la primera entrega).
+  - Un `nack(requeue=True)` posterior lo deja en `count=1`; cada devolución suma 1. Con 6 entregas en total (1 + 5 reintentos) el mensaje pasa a la dead-letter.
+  - **Perder la conexión con el mensaje retenido SÍ suma 1** (`count=2` en el experimento); cerrar solo el canal también suma 1.
+  - **Consecuencia**: la retención protege a los mensajes mientras la api está caída, pero cada reconexión o apagado con un mensaje retenido le cuesta un reintento. Los hilos NO deben reconectar en bucle con mensajes retenidos; y en el apagado ordenado conviene terminar el mensaje en curso antes que devolverlo, cuando sea posible.
 - **Ajuste a la spec**: FR-024 dice "los mensajes en curso al abrirse el corte se devuelven a la cola". El diseño los retiene (mejor para SC-009). Se corrige el texto de FR-024 al generar las tareas.
 
 ## D4. `id_mensaje`
@@ -62,3 +67,8 @@
 
 ## D11. Docker
 - Imagen propia `docker/worker/Dockerfile` (python:3.12-slim, usuario no root, `ENTRYPOINT ["python","-m","recos_auto.worker"]`). Compose: `worker` + mock de Notificaciones (cola declarada por un script de arranque del test, como haría Notificaciones).
+
+## D12. Que cada usuario reciba SU recomendación (FR-025)
+- api-general ahora devuelve `recommendation_id` en la respuesta (commit `57fefd4` en la rama `feature/recos-auto-usuarios-contacto`, sin mergear), de modo que el worker verifica de quién es la recomendación.
+- La integridad se apoya en: (1) el par `recommendation_id`/`email` llega junto en el mismo registro de api-general y el cron lo copia sin transformarlo; (2) el worker usa solo datos del mensaje en curso, sin caché ni estado compartido (cliente HTTP por hilo); (3) se verifica que `recommendation_id` y `module` de la respuesta coinciden con el pedido; si no, no se notifica y el mensaje va a dead-letter.
+- **Límite conocido**: un email cambiado en api-general entre la corrida y el procesamiento (hasta 2 h) se notifica al mail anterior; es aceptable por el TTL.

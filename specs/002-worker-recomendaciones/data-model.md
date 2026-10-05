@@ -8,6 +8,7 @@ Contrato v1 de la feature 001: `version`, `message_id` (UUID), `corrida_id`, `fe
 ## Recomendacion (respuesta de api-general)
 | Campo | Tipo | Regla |
 |---|---|---|
+| `recommendation_id` | UUID | requerido; debe ser igual al del mensaje (FR-025) |
 | `item_id` | UUID | requerido |
 | `module` | `peliculas` \| `juegos` | debe coincidir con el pedido |
 | `titulo` | str | no vacío tras recortar; si no, "sin recomendación" |
@@ -32,3 +33,10 @@ Mapeo a RabbitMQ: `NOTIFICADO` y `SIN_RECOMENDACION` → `ack`; `INVALIDO` → `
 
 ## Contadores
 `recibidos`, `notificados`, `sin_recomendacion`, `invalidos`, `reintentados`, `pausas_del_corte`, `inicio`. Todos con lock.
+
+## Invariante de identidad usuario ↔ recomendación (FR-025)
+Para cada notificación publicada se cumple, y se prueba:
+- La recomendación se pidió con `mensaje.recommendation_id` y el módulo `mensaje.modulo`.
+- `notificacion.mail == mensaje.email` y `notificacion.destinatario == mensaje.user_id` (mismo mensaje).
+- `respuesta.recommendation_id == mensaje.recommendation_id` y `respuesta.module == mensaje.modulo`; si no, no se notifica (dead-letter).
+- Ni el cliente HTTP ni el procesador guardan estado entre mensajes (sin caché, sin variables compartidas entre hilos); cada hilo tiene su cliente.

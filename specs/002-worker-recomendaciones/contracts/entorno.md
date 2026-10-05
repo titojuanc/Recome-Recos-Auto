@@ -20,10 +20,10 @@ Los valores son de ejemplo; los secretos solo por entorno. Si falta alguna oblig
 | `WORKER_CONCURRENCY` | `4` | Hilos, mínimo 1. |
 | `API_GENERAL_TIMEOUT_S` | `10` | Timeout por llamada. |
 | `PUBLISH_CONFIRM_TIMEOUT_S` | `10` | Espera del confirm del broker. |
-| `BREAKER_FAILURES` | `5` | Fallos transitorios seguidos para abrir el corte. |
+| `BREAKER_FAILURES` | `5` | Fallos transitorios seguidos para abrir el corte. `0` = interruptor deshabilitado (los tests lo usan para ver los reintentos nativos de RabbitMQ). |
 | `BREAKER_BACKOFF_S` | `5` | Espera inicial del corte (se duplica). |
 | `BREAKER_BACKOFF_MAX_S` | `60` | Tope de la espera. |
-| `BREAKER_MAX_HOLD_S` | `600` | Máximo de retención de un mensaje sin confirmar. |
+| `BREAKER_MAX_HOLD_S` | `1500` | Máximo de retención de un mensaje sin confirmar. Debe ser < 1800 (el `consumer_timeout` por defecto de RabbitMQ es 30 min); si no, el arranque falla con código 78. |
 | `NOTIF_TITULO_TEMPLATE` | `Tu recomendación de hoy: {titulo}` | Variables: `titulo`, `modulo`. |
 | `NOTIF_CUERPO_TEMPLATE` | `Hoy te recomendamos {que_es}: {titulo}. Mirala acá: {url}` | Variables: `titulo`, `modulo`, `que_es`, `url`. |
 | `NOTIF_URL_TEMPLATE` | `https://recome.example/{modulo}/{item_id}` | Provisional; la página no existe aún. |

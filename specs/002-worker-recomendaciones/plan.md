@@ -41,7 +41,7 @@ La concurrencia es de **N hilos** (`WORKER_CONCURRENCY`, por defecto 4), cada un
 | VI. Convención RabbitMQ | PASS | Topología de usuarios desde `common/topology.py`; no declara la cola de Notificaciones; confirms y persistencia. |
 | VII. Test-first y contract testing | PASS | Ver "Estrategia de pruebas". |
 | VIII. Observabilidad y seguridad | PASS con nota | Logs estructurados y resumen con contadores. Sin `/metrics` (sin puertos). |
-| IX. Simplicidad | **VIOLACIÓN JUSTIFICADA** | Concurrencia interna con N hilos (decisión de clarificación 4). Ver Complexity Tracking; el principio IX ya fue enmendado (constitución v2.4.0). |
+| IX. Simplicidad | PASS con enmienda (v2.4.0) | Concurrencia interna con N hilos e interruptor de corte, autorizados por la enmienda v2.4.0 del principio IX. Justificación en Complexity Tracking. |
 
 ## Project Structure
 
