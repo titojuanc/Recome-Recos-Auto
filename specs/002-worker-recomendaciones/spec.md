@@ -99,6 +99,8 @@ Quien opera el sistema puede desplegar el worker como contenedor, detenerlo sin 
 
 ### Functional Requirements
 
+> Nota: FR-022 a FR-025 se agregaron durante la clarificación y el análisis y se dejan donde están para no romper las referencias en plan, tasks, research y data-model. El orden de lectura no implica prioridad.
+
 - **FR-001**: El sistema MUST consumir la cola de usuarios `recos-auto.usuarios` con una única instancia, procesando varios mensajes en paralelo con un número de hilos configurable (`WORKER_CONCURRENCY`, mínimo 1). No se garantiza el orden entre mensajes.
 - **FR-002**: El sistema MUST validar cada mensaje contra el contrato de mensaje de usuario v1 (feature 001) antes de usarlo; los inválidos no se procesan.
 - **FR-003**: El sistema MUST obtener la recomendación del usuario y el módulo del mensaje a través de api-general (nunca llamando directo al servicio de recomendaciones ni a otras fuentes), autenticándose con la clave interna.
@@ -140,7 +142,7 @@ Quien opera el sistema puede desplegar el worker como contenedor, detenerlo sin 
 - **SC-002**: Reprocesar el mismo mensaje de usuario produce siempre el mismo identificador de notificación (0 identidades distintas).
 - **SC-003**: Ante cualquier error, 0 notificaciones de error o parciales llegan a la cola de Notificaciones.
 - **SC-004**: Los fallos transitorios simulados se reintentan hasta 5 veces y luego van a dead-letter; el 100 % de los mensajes termina en un estado final registrado.
-- **SC-005**: 10 000 mensajes se procesan en menos de 2 horas con una sola instancia (cumple SC-009 de la feature 001).
+- **SC-005**: 10 000 mensajes se procesan en menos de 2 horas con una sola instancia (cumple SC-009 (001), la verificación pendiente de la feature 001).
 - **SC-006**: Un SIGTERM detiene el worker en menos de 30 segundos sin pérdida ni duplicación de notificaciones.
 - **SC-007**: 0 líneas de log contienen emails, nombres o credenciales, verificado con una corrida completa.
 - **SC-008**: Tras una caída y recuperación de RabbitMQ o api-general, el worker vuelve a procesar sin intervención manual.

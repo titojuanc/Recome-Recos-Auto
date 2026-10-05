@@ -14,14 +14,14 @@
 
 ## D3. Interruptor de corte (clarificación 5)
 - **Decisión**: estado compartido con lock: `cerrado` → `abierto` tras `BREAKER_FAILURES` (5) fallos transitorios **consecutivos** (el éxito reinicia el contador). Abierto: ningún hilo toma ni procesa mensajes; espera creciente `BREAKER_BACKOFF_S` (5 s, ×2, tope 60 s). Pasada la espera pasa a `semiabierto`: un solo hilo prueba con un mensaje; si tiene éxito se cierra, si falla se reabre con más espera.
-- **Retención sin confirmar**: un mensaje entregado a un hilo cuando el corte abre se **retiene sin `ack` ni `nack`** y se reintenta en el lugar al reanudar. Retener no incrementa el `delivery-count` de la quorum queue; solo lo hace un `nack(requeue)`. Así se cumple SC-009. Mientras espera, el hilo llama `connection.process_data_events()` para sostener los heartbeats.
+- **Retención sin confirmar**: un mensaje entregado a un hilo cuando el corte abre se **retiene sin `ack` ni `nack`** y se reintenta en el lugar al reanudar. Retener no incrementa el `delivery-count` de la quorum queue; solo lo hace un `nack(requeue)`. Así se cumple SC-009 (002). Mientras espera, el hilo llama `connection.process_data_events()` para sostener los heartbeats.
 - **Límite**: el `consumer_timeout` de las quorum queues (por defecto 30 min en RabbitMQ 3.8.15+) cierra el canal si un mensaje queda sin confirmar más de ese tiempo. La retención máxima por mensaje se acota a `BREAKER_MAX_HOLD_S` (por defecto 1500 s, validado < 1800 s); superado, se hace `nack(requeue)` normal.
 - **Verificado (RabbitMQ 3.13, pika 1.4.4, quorum queue con `x-delivery-limit=5`, 2026-10-05)**:
   - Retener un mensaje 40 s sin `ack` ni `nack`, con `process_data_events()` sosteniendo los heartbeats: **no** incrementa `x-delivery-count` (el header ni aparece en la primera entrega).
   - Un `nack(requeue=True)` posterior lo deja en `count=1`; cada devolución suma 1. Con 6 entregas en total (1 + 5 reintentos) el mensaje pasa a la dead-letter.
   - **Perder la conexión con el mensaje retenido SÍ suma 1** (`count=2` en el experimento); cerrar solo el canal también suma 1.
   - **Consecuencia**: la retención protege a los mensajes mientras la api está caída, pero cada reconexión o apagado con un mensaje retenido le cuesta un reintento. Los hilos NO deben reconectar en bucle con mensajes retenidos; y en el apagado ordenado conviene terminar el mensaje en curso antes que devolverlo, cuando sea posible.
-- **Ajuste a la spec**: FR-024 dice "los mensajes en curso al abrirse el corte se devuelven a la cola". El diseño los retiene (mejor para SC-009). Se corrige el texto de FR-024 al generar las tareas.
+- **Ajuste a la spec (aplicado)**: FR-024 decía que los mensajes en curso se devolvían a la cola; el diseño los retiene (mejor para SC-009 (002)) y FR-024 ya fue corregido.
 
 ## D4. `id_mensaje`
 - **Decisión**: `int.from_bytes(UUID(message_id).bytes[:8], "big") & 0x7FFF_FFFF_FFFF_FFFF`; si da 0, se usa 1. `message_id` ya es UUIDv5 de `user_id|fecha|modulo` (feature 001), por lo que es estable por usuario, fecha y módulo.

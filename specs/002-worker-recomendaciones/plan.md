@@ -93,7 +93,7 @@ tests/
 
 - **Unit**: `id_mensaje` (determinismo, rango positivo de 63 bits, distintos para distintos usuarios/fechas/módulos); armado de contenido (título con caracteres raros, truncado); clasificación de errores (404/412 → resuelto; 5xx/timeout/red → transitorio; 400/401/403 → fallo de configuración); interruptor (apertura, espera creciente, cierre); config.
 - **Contract**: notificación publicada válida contra `mensaje-notificacion.schema.json`; `ConfigWorker` produce los mismos argumentos de cola que el cron (`topology`); respuesta de api-general contra el contrato.
-- **Integración** (RabbitMQ real + api simulada): flujo completo N mensajes → N notificaciones; 404/412 sin notificación; 503 → reintentos → dead-letter tras 5; mensaje inválido directo a dead-letter; corte de api-general 10 min simulados (SC-009, con tiempos reducidos); SIGTERM; reconexión; 10 000 mensajes (marcada `lento`).
+- **Integración** (RabbitMQ real + api simulada): flujo completo N mensajes → N notificaciones; 404/412 sin notificación; 503 → reintentos → dead-letter tras 5; mensaje inválido directo a dead-letter; corte de api-general 10 min simulados (SC-009 (002), con tiempos reducidos); SIGTERM; reconexión; 10 000 mensajes (marcada `lento`).
 
 ## Complexity Tracking
 

@@ -64,7 +64,7 @@
 - [ ] T025 [US2] `src/recos_auto/worker/interruptor.py`. Hace pasar T024.
 - [ ] T026 [P] [US2] Test de integración `tests/integration/test_worker_fallos.py`: 404 y 412 → cola de salida vacía, mensaje confirmado, motivo en logs; 503 persistente (con `BREAKER_FAILURES=0`, que deshabilita el interruptor) → 6 entregas y luego dead-letter; mensaje inválido → dead-letter directo sin reintentos; cola de salida inexistente → reintento y nunca `ack` sin publicar.
 - [ ] T027 [US2] Completar `consumidor.py`: `ack` para `NOTIFICADO` y `SIN_RECOMENDACION`, `nack(requeue=False)` para `INVALIDO`, `nack(requeue=True)` para `TRANSITORIO`. Hace pasar T026.
-- [ ] T028 [P] [US2] Test de integración `tests/integration/test_worker_corte.py` (SC-009, tiempos reducidos): con api caída y mensajes en cola, el worker registra `corte_abierto`, ningún mensaje llega a dead-letter y el `x-delivery-count` no crece; al volver la api registra `corte_cerrado` y procesa todo; un mensaje retenido más de `BREAKER_MAX_HOLD_S` se devuelve a la cola.
+- [ ] T028 [P] [US2] Test de integración `tests/integration/test_worker_corte.py` (SC-009 (002), tiempos reducidos): con api caída y mensajes en cola, el worker registra `corte_abierto`, ningún mensaje llega a dead-letter y el `x-delivery-count` no crece; al volver la api registra `corte_cerrado` y procesa todo; un mensaje retenido más de `BREAKER_MAX_HOLD_S` se devuelve a la cola.
 - [ ] T029 [US2] Integrar el interruptor en `consumidor.py`: retención sin confirmar del mensaje en curso, `process_data_events()` para sostener heartbeats durante la espera, tope de retención, reanudación con un único mensaje de prueba. Hace pasar T028.
 - [ ] T030 [P] [US2] Test de integración `tests/integration/test_worker_reconexion.py` (FR-015, SC-008): cerrar las conexiones del consumidor desde el broker o reiniciar el contenedor de RabbitMQ de prueba; el worker reconecta con espera creciente y retoma sin intervención; el mensaje en curso se reprocesa sin duplicar la identidad.
 - [ ] T031 [US2] Reconexión con espera creciente en `consumidor.py` y en `publicador.py`. Hace pasar T030.
@@ -81,7 +81,7 @@
 - [ ] T033 [US3] `__main__.py`: lanzar `WORKER_CONCURRENCY` hilos, cada uno con su conexión, canal y cliente HTTP; el interruptor y los contadores se comparten. Hace pasar T032.
 - [ ] T034 [P] [US3] Test de rendimiento `tests/integration/test_worker_rendimiento.py` (marcador `lento`): 10 000 mensajes con latencia simulada de la api; todos procesados en menos de 2 h (SC-005) y 0 duplicados. Anotar en el reporte la latencia máxima tolerable por llamada.
 
-**Checkpoint**: SC-005 verificado y SC-009 de la feature 001 cerrado.
+**Checkpoint**: SC-005 verificado y SC-009 (001) cerrado.
 
 ---
 
@@ -105,7 +105,7 @@
 
 - [ ] T044 Ejecutar `ruff check` y `ruff format`; toda la suite (`pytest -q`) incluyendo las pruebas del cron.
 - [ ] T045 Ejecutar el flujo de `quickstart.md` (secciones 1 a 3) y registrar los resultados.
-- [ ] T046 Verificar SC-003 con un test transversal: con todos los modos de fallo activos, la cola de salida recibe 0 mensajes de error o parciales.
+- [ ] T046 Verificar SC-003, FR-014 y FR-021 con un test transversal `tests/integration/test_worker_invariantes.py`: con todos los modos de fallo activos, (a) la cola de salida recibe 0 mensajes de error o parciales (SC-003); (b) el worker no escribe archivos fuera de `/tmp` durante la corrida y no deja datos de usuario en disco (FR-014); (c) notificados + sin recomendación + inválidos + reintentados es igual a los recibidos, es decir, ningún mensaje se pierde en silencio (FR-021).
 - [ ] T047 Verificar que `common/topology.py` sigue dando los mismos argumentos que usa el cron (tests de la feature 001 en verde) y que el worker no declara nunca la cola de salida.
 - [ ] T048 Actualizar `research.md` y `spec.md` con lo aprendido (por ejemplo, la latencia tolerable medida en T034 y el comportamiento real del `consumer_timeout`).
 - [ ] T049 Confirmar el contrato con api-general y con Notificaciones cuando estén disponibles (rama sin mergear, nombre de la cola de salida, versión de RabbitMQ) y anotar las diferencias.
