@@ -12,6 +12,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 OBLIGATORIAS = ("API_GENERAL_BASE_URL", "API_GENERAL_API_KEY", "RABBITMQ_URL")
 
+# Compartidos por el cron y el worker: la topología de la cola de usuarios debe coincidir
+# exactamente (si no, RabbitMQ responde 406 PRECONDITION_FAILED).
+COLA_USUARIOS_DEFECTO = "recos-auto.usuarios"
+DELIVERY_LIMIT_DEFECTO = 5
+TTL_USUARIOS_MS_DEFECTO = 7_200_000
+TTL_DEAD_LETTER_MS_DEFECTO = 604_800_000
+
 
 class ConfigError(Exception):
     """Configuración incompleta o inválida. Nunca incluye valores, solo nombres de variables."""
@@ -42,10 +49,10 @@ class Config:
     api_max_retries: int = 3
     api_retry_backoff_s: float = 1.0
     api_max_pages: int = 1000
-    users_queue: str = "recos-auto.usuarios"
-    delivery_limit: int = 5
-    users_message_ttl_ms: int = 7_200_000  # 2 h (FR-014)
-    dead_letter_ttl_ms: int = 604_800_000  # 7 días (FR-014)
+    users_queue: str = COLA_USUARIOS_DEFECTO
+    delivery_limit: int = DELIVERY_LIMIT_DEFECTO
+    users_message_ttl_ms: int = TTL_USUARIOS_MS_DEFECTO  # 2 h (FR-014)
+    dead_letter_ttl_ms: int = TTL_DEAD_LETTER_MS_DEFECTO  # 7 días (FR-014)
     publish_max_retries: int = 3
     publish_retry_backoff_s: float = 0.5
     max_consecutive_publish_failures: int = 5

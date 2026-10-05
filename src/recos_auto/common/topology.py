@@ -6,9 +6,25 @@ por eso cron y worker deben usar exactamente esta función.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
-from recos_auto.common.config import Config
+
+class ConfigCola(Protocol):
+    """Lo mínimo que necesita la topología; lo cumplen `Config` (cron) y `ConfigWorker`."""
+
+    users_queue: str
+    delivery_limit: int
+    users_message_ttl_ms: int
+    dead_letter_ttl_ms: int
+
+    @property
+    def dead_letter_queue(self) -> str: ...
+
+    @property
+    def dead_letter_exchange(self) -> str: ...
+
+
+Config = ConfigCola  # alias para las firmas existentes
 
 
 def argumentos_cola_usuarios(cfg: Config) -> dict[str, Any]:

@@ -120,3 +120,119 @@ def config_rabbit(env_base, conexion_rabbit):
         for cola in (cfg.users_queue, cfg.dead_letter_queue):
             canal.queue_delete(cola)
         canal.exchange_delete(cfg.dead_letter_exchange)
+
+
+# --------------------------------------------------------------------------------------
+# Fixtures del worker (feature 002)
+# --------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def env_worker(env_base) -> dict[str, str]:
+    return dict(env_base)
+
+
+@pytest.fixture
+def config_worker(env_base, conexion_rabbit):
+    """ConfigWorker con colas únicas por test (usuarios y notificaciones); se borran al final."""
+    from recos_auto.worker.config import ConfigWorker
+
+    sufijo = uuid.uuid4().hex[:8]
+    env = dict(
+        env_base,
+        RABBITMQ_URL=URL_RABBIT_TEST,
+        RABBITMQ_USERS_QUEUE=f"recos-auto.test-{sufijo}.usuarios",
+        RABBITMQ_QUEUE_NOTIFICACIONES=f"recos-auto.test-{sufijo}.notificaciones",
+        WORKER_POLL_S="0.1",
+        SUMMARY_INTERVAL_S="3600",
+        BREAKER_BACKOFF_S="0.2",
+        BREAKER_BACKOFF_MAX_S="0.5",
+    )
+    cfg = ConfigWorker.from_env(env)
+    canal = conexion_rabbit.channel()
+    # Quien declara la cola de notificaciones es Recome-Notificaciones; aquí la simula el test.
+    canal.queue_declare(
+        queue=cfg.notificaciones_queue, durable=True, arguments={"x-queue-type": "quorum"}
+    )
+    yield cfg
+    if conexion_rabbit.is_open:
+        canal = conexion_rabbit.channel()
+        for cola in (cfg.users_queue, cfg.dead_letter_queue, cfg.notificaciones_queue):
+            canal.queue_delete(cola)
+        canal.exchange_delete(cfg.dead_letter_exchange)
+
+
+def mensaje_usuario_dict(
+    user_id: int, modulo: str = "peliculas", fecha: str = "2026-10-06", email: str | None = None
+) -> dict:
+    from datetime import date
+
+    from recos_auto.common.mensajes import message_id_para
+
+    return {
+        "version": 1,
+        "message_id": str(message_id_para(user_id, date.fromisoformat(fecha), modulo)),
+        "corrida_id": "corrida-test",
+        "fecha": fecha,
+        "modulo": modulo,
+        "recommendation_id": str(uuid.UUID(int=user_id)),
+        "user_id": user_id,
+        "nombre": f"Usuario {user_id}",
+        "email": email or f"u{user_id}@example.com",
+        "idioma": "es",
+    }
+
+
+@pytest.fixture
+def publicar_usuarios(conexion_rabbit, config_worker):
+    """Publica `n` mensajes de usuario válidos en la cola de entrada (declarando la topología)."""
+    import json
+
+    from recos_auto.common.topology import declarar_topologia
+
+    def _publicar(n: int, desde: int = 1, modulo: str = "peliculas") -> list[dict]:
+        canal = conexion_rabbit.channel()
+        declarar_topologia(canal, config_worker)
+        mensajes = [mensaje_usuario_dict(i, modulo) for i in range(desde, desde + n)]
+        for m in mensajes:
+            canal.basic_publish(
+                exchange="",
+                routing_key=config_worker.users_queue,
+                body=json.dumps(m).encode(),
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+        canal.close()
+        return mensajes
+
+    return _publicar
+
+
+@pytest.fixture
+def leer_cola(conexion_rabbit):
+    """Vacía una cola y devuelve los cuerpos JSON (para inspeccionar notificaciones)."""
+    import json
+
+    def _leer(nombre: str) -> list[dict]:
+        canal = conexion_rabbit.channel()
+        salida = []
+        while True:
+            metodo, _props, cuerpo = canal.basic_get(nombre, auto_ack=True)
+            if metodo is None:
+                break
+            salida.append(json.loads(cuerpo))
+        canal.close()
+        return salida
+
+    return _leer
+
+
+@pytest.fixture
+def profundidad(conexion_rabbit):
+    def _p(nombre: str) -> int:
+        canal = conexion_rabbit.channel()
+        try:
+            return canal.queue_declare(queue=nombre, passive=True).method.message_count
+        finally:
+            canal.close()
+
+    return _p
