@@ -6,6 +6,9 @@ import logging
 import signal
 import sys
 import threading
+import time
+
+import pika
 
 from recos_auto.common.config import ConfigError
 from recos_auto.common.logs import configurar_logs, evento
@@ -16,8 +19,38 @@ from recos_auto.worker.interruptor import Interruptor
 from recos_auto.worker.recomendaciones import ClienteRecomendaciones
 
 EXIT_OK = 0
+EXIT_APAGADO_FORZADO = 75
 EXIT_CONFIG = 78
 log = logging.getLogger("recos_auto.worker")
+
+
+def _pendientes(cfg: ConfigWorker) -> int | None:
+    """Mensajes en la cola de entrada (consulta pasiva); None si no se pudo consultar."""
+    try:
+        conexion = pika.BlockingConnection(pika.URLParameters(cfg.rabbitmq_url))
+        try:
+            canal = conexion.channel()
+            return canal.queue_declare(queue=cfg.users_queue, passive=True).method.message_count
+        finally:
+            conexion.close()
+    except Exception:  # noqa: BLE001 - es solo informativo
+        return None
+
+
+def _resumen(cfg: ConfigWorker, contadores: Contadores, interruptor: Interruptor) -> None:
+    evento(
+        log,
+        "resumen",
+        logging.INFO,
+        pendientes=_pendientes(cfg),
+        interruptor=interruptor.estado,
+        **contadores.resumen(),
+    )
+
+
+def _bucle_resumen(cfg, contadores, interruptor, parar: threading.Event) -> None:
+    while not parar.wait(cfg.summary_interval_s):
+        _resumen(cfg, contadores, interruptor)
 
 
 def ejecutar(
@@ -41,15 +74,27 @@ def ejecutar(
     evento(log, "worker_iniciado", logging.INFO, concurrencia=cfg.concurrency)
     for hilo in hilos:
         hilo.start()
+    threading.Thread(
+        target=_bucle_resumen, args=(cfg, contadores, interruptor, parar), daemon=True
+    ).start()
+
+    codigo = EXIT_OK
     try:
+        while any(h.is_alive() for h in hilos) and not parar.is_set():
+            parar.wait(0.5)
+        # Apagado: cada hilo termina el mensaje en curso; esperamos hasta SHUTDOWN_TIMEOUT_S.
+        limite = time.monotonic() + cfg.shutdown_timeout_s
         for hilo in hilos:
-            while hilo.is_alive():
-                hilo.join(timeout=0.5)
+            hilo.join(timeout=max(0.0, limite - time.monotonic()))
+        if any(h.is_alive() for h in hilos):
+            codigo = EXIT_APAGADO_FORZADO
+            evento(log, "apagado_forzado", logging.ERROR)
     finally:
         parar.set()
         cliente.cerrar()
-    evento(log, "worker_detenido", logging.INFO, **contadores.snapshot())
-    return EXIT_OK
+    _resumen(cfg, contadores, interruptor)
+    evento(log, "worker_detenido", logging.INFO, codigo=codigo)
+    return codigo
 
 
 def main() -> int:

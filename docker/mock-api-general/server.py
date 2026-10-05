@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 RUTA = "/internal/v1/notification-targets"
+RUTA_RECOMENDACION = "/internal/v1/notification-recommendations/"
 
 
 def usuarios(cantidad: int) -> list[dict]:
@@ -45,6 +46,21 @@ def crear_servidor(puerto: int, cantidad: int, demora: float, clave: str) -> Thr
             url = urlparse(self.path)
             if url.path == "/health":
                 return self._responder(200, {"status": "ok"})
+            if RUTA_RECOMENDACION in url.path:
+                if self.headers.get("X-Internal-API-Key") != clave:
+                    return self._responder(401, {"error": "clave"})
+                rid = url.path.rsplit("/", 1)[-1]
+                modulo = parse_qs(url.query).get("module", ["peliculas"])[0]
+                return self._responder(
+                    200,
+                    {
+                        "recommendation_id": rid,
+                        "item_id": str(uuid.uuid5(uuid.NAMESPACE_URL, rid + modulo)),
+                        "module": modulo,
+                        "titulo": f"Título de prueba {rid[-4:]}",
+                        "position": 1,
+                    },
+                )
             if not url.path.endswith(RUTA):
                 return self._responder(404, {"error": "ruta"})
             if self.headers.get("X-Internal-API-Key") != clave:
