@@ -56,7 +56,7 @@ Ciclo rojo-verde-refactor. Obligatorios: tests unitarios (paginación, alternanc
 Logs estructurados con id de corrida y de usuario, sin email ni nombre. Métricas por corrida (usuarios listados, encolados, notificados, sin recomendación, reintentados, en dead-letter, duración) y alerta si la corrida no ocurre o la cola se acumula. Secretos solo por variables de entorno (`.env.example` sin valores reales). Sin endpoints accesibles desde frontends.
 
 ### IX. Simplicidad
-YAGNI: un cron y un worker Python (pika + cliente HTTP), una instancia de worker, sin frameworks ni servicios adicionales sin justificación escrita. Paralelismo y limitación de velocidad solo si se demuestra necesario.
+YAGNI: un cron y un worker Python (pika + cliente HTTP), una instancia de worker, sin frameworks ni servicios adicionales sin justificación escrita. El worker puede procesar con concurrencia interna configurable (hilos, una conexión por hilo) y un interruptor de corte ante fallos sostenidos de api-general (enmienda v2.4.0, feature 002); limitación de velocidad y más instancias solo si se demuestra necesario.
 
 ## Contenido de la notificación
 
@@ -79,4 +79,4 @@ Armado por el worker: `titulo` y `cuerpo` con el título del ítem, el módulo (
 
 Esta constitución prevalece sobre otras prácticas del repo. Las enmiendas requieren documentar el motivo, actualizar la versión (semver) y revisar la coherencia con las constituciones de api-general y Notificaciones. Todo PR verifica el cumplimiento de los principios I-IX.
 
-**Version**: 2.3.0 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-05
+**Version**: 2.4.0 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-05

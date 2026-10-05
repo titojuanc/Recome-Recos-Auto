@@ -115,7 +115,7 @@ Quien opera el sistema puede desplegar el worker como contenedor, detenerlo sin 
 - **FR-014**: El sistema MUST NOT persistir datos de usuario (email, nombre) más allá del mensaje en curso.
 - **FR-022**: La unicidad de la notificación por usuario, día y módulo MUST garantizarse únicamente mediante el `id_mensaje` determinístico: el worker no guarda estado de notificaciones previas ni consulta a Notificaciones.
 - **FR-023**: Con concurrencia, cada mensaje MUST confirmarse, reintentarse o enviarse a dead-letter de forma independiente; el fallo de uno no afecta a los demás en curso, y el apagado ordenado espera a todos los mensajes en curso.
-- **FR-024**: Tras un número configurable de fallos transitorios consecutivos de api-general o de publicación, el sistema MUST pausar el consumo con espera creciente (acotada y configurable) y reanudarlo al recuperarse. Mientras está pausado, no toma mensajes de la cola, de modo que no consumen sus reintentos; los mensajes en curso al abrirse el corte se devuelven a la cola. La pausa se registra en los logs.
+- **FR-024**: Tras un número configurable de fallos transitorios consecutivos de api-general o de publicación, el sistema MUST pausar el consumo con espera creciente (acotada y configurable) y reanudarlo al recuperarse. Mientras está pausado, no toma mensajes de la cola, de modo que no consumen sus reintentos; los mensajes en curso al abrirse el corte se retienen sin confirmar (sin gastar reintentos) hasta un máximo configurable y luego se devuelven a la cola. La pausa se registra en los logs.
 - **FR-015**: El sistema MUST tolerar caídas de RabbitMQ y de api-general reconectándose con espera creciente, sin perder mensajes ni terminar.
 - **FR-016**: El sistema MUST aplicar un tiempo máximo a cada llamada a api-general y a cada publicación, de modo que un mensaje no bloquee indefinidamente al worker.
 - **FR-017**: El sistema MUST atender SIGTERM/SIGINT de forma ordenada: terminar o devolver el mensaje en curso, no tomar otro, cerrar conexiones y salir.
@@ -152,7 +152,7 @@ Quien opera el sistema puede desplegar el worker como contenedor, detenerlo sin 
 - El canal es siempre `mail`; push queda fuera de alcance.
 - El contenido es solo en español; el texto exacto de título y cuerpo se fija en la planificación y es configurable por variable de entorno.
 - La página de destino aún no existe: el enlace se construye con una plantilla de URL configurable y puede quedar con un valor provisional.
-- Una sola instancia de worker con concurrencia interna configurable (`WORKER_CONCURRENCY`); no se agregan instancias. El valor por defecto y el modelo de concurrencia se fijan en la planificación. Esto relaja el principio IX de la constitución ("paralelismo solo si se demuestra necesario"), que debe enmendarse en la planificación.
+- Una sola instancia de worker con concurrencia interna configurable (`WORKER_CONCURRENCY`); no se agregan instancias. El valor por defecto y el modelo de concurrencia se fijan en la planificación. Esto relaja el principio IX de la constitución ("paralelismo solo si se demuestra necesario"), enmendado en la constitución v2.4.0.
 - La cola de Notificaciones ya existe y la administra su equipo; el nombre por defecto es `notificaciones` y se confirmará contra el RabbitMQ real.
 - RabbitMQ 3.10 o superior (colas quorum con límite de entregas).
 - No existe preferencia de baja: si api-general la agrega, filtra antes del cron.
