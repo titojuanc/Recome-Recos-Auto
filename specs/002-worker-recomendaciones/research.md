@@ -72,3 +72,17 @@
 - api-general ahora devuelve `recommendation_id` en la respuesta (commit `57fefd4` en la rama `feature/recos-auto-usuarios-contacto`, sin mergear), de modo que el worker verifica de quién es la recomendación.
 - La integridad se apoya en: (1) el par `recommendation_id`/`email` llega junto en el mismo registro de api-general y el cron lo copia sin transformarlo; (2) el worker usa solo datos del mensaje en curso, sin caché ni estado compartido (cliente HTTP por hilo); (3) se verifica que `recommendation_id` y `module` de la respuesta coinciden con el pedido; si no, no se notifica y el mensaje va a dead-letter.
 - **Límite conocido**: un email cambiado en api-general entre la corrida y el procesamiento (hasta 2 h) se notifica al mail anterior; es aceptable por el TTL.
+
+## D13. Resultados medidos (implementación)
+
+- **Rendimiento (SC-005)**: 10 000 mensajes, 8 hilos, 5 ms por llamada a api-general → 17,8 s,
+  0 duplicados. Latencia máxima tolerable por llamada ≈ 7200 s × N hilos / 10 000
+  (4 hilos ≈ 2,9 s; 8 hilos ≈ 5,7 s).
+- **Reconexión (FR-015)**: al cerrar las conexiones desde el broker (API de administración), cada
+  hilo reconecta con espera creciente y retoma sin duplicar `id_mensaje`.
+- **Extremo a extremo con docker compose**: cron (mock de 25 usuarios) → worker → cola
+  `notificaciones`: 25 notificaciones, una por usuario, con su propio mail y su recomendación.
+- **Nota operativa**: el servicio `cron` del compose ejecuta supercronic; para una corrida manual
+  usar `docker compose run --rm --entrypoint python cron -m recos_auto.cron run`.
+- **`consumer_timeout`**: se mantiene el límite `BREAKER_MAX_HOLD_S` (1500 s) < 1800 s; no se
+  probó el vencimiento real de 30 min (sería una prueba de 30 min).

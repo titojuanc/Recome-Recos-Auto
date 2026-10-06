@@ -162,3 +162,9 @@ Quien opera el sistema puede desplegar el worker como contenedor, detenerlo sin 
 - No existe preferencia de baja: si api-general la agrega, filtra antes del cron.
 - Fuera de alcance: el cron, el envío efectivo de mail/push, el cálculo de recomendaciones, y cambios de contrato en api-general o Notificaciones (se proponen al repo custodio).
 - Dependencias: feature 001 (contrato del mensaje de usuario y topología compartida), api-general, RabbitMQ y Recome-Notificaciones.
+
+## Verificación de la implementación
+
+SC-003, SC-005, SC-008, SC-009 y SC-010 cubiertos por tests de integración
+(`test_worker_invariantes.py`, `test_worker_rendimiento.py`, `test_worker_reconexion.py`,
+`test_worker_flujo.py`). Mediciones en `research.md` D13.
