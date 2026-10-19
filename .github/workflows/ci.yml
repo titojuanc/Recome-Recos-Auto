@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches-ignore: [dev]  # en dev lo ejecuta deploy-dev.yml (workflow_call)
   pull_request:
     branches: ["**"]
   workflow_call:
