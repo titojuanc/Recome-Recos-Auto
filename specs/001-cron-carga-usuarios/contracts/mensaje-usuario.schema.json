@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://recome.local/schemas/mensaje-usuario.v1.json",
+  "title": "MensajeUsuario",
+  "description": "Mensaje que el cron publica en la cola recos-auto.usuarios, uno por usuario y por corrida. Lo consume el worker (feature 002). Contiene datos personales: no loguear.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "message_id", "corrida_id", "fecha", "modulo", "recommendation_id", "user_id", "nombre", "email"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv5 determinístico de '{user_id}|{fecha}|{modulo}'. Igual en cada reejecución del mismo día."
+    },
+    "corrida_id": { "type": "string", "minLength": 1, "description": "Identificador de la corrida; solo trazabilidad." },
+    "fecha": { "type": "string", "format": "date", "description": "Fecha de la corrida en la zona configurada (UTC-3 por defecto)." },
+    "modulo": { "type": "string", "enum": ["peliculas", "juegos"] },
+    "recommendation_id": { "type": "string", "format": "uuid", "description": "UUID público del usuario, usado para pedir la recomendación." },
+    "user_id": { "type": "integer", "minimum": 1, "description": "Id numérico del usuario; se usará como 'destinatario' en la notificación." },
+    "nombre": { "type": "string", "minLength": 1 },
+    "email": { "type": "string", "format": "email" },
+    "idioma": { "type": ["string", "null"], "description": "Código BCP 47 si api-general lo informa." }
+  }
+}

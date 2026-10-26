@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://recome.local/schemas/mensaje-notificacion.v1.json",
+  "title": "MensajeNotificacion (subconjunto que produce el worker)",
+  "description": "Espejo del contrato de Recome-Notificaciones. Custodia: Recome-Notificaciones. El worker solo produce canal=mail sin adjunto ni callback.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id_mensaje", "canal", "destinatario", "mail", "contenido"],
+  "properties": {
+    "id_mensaje": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+    "canal": { "const": "mail" },
+    "destinatario": { "type": "integer", "minimum": 1 },
+    "mail": { "type": "string", "format": "email" },
+    "contenido": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["titulo", "cuerpo"],
+      "properties": {
+        "titulo": { "type": "string", "minLength": 1 },
+        "cuerpo": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
