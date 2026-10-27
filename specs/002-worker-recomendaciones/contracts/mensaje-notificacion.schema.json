@@ -2,23 +2,136 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://recome.local/schemas/mensaje-notificacion.v1.json",
   "title": "MensajeNotificacion (subconjunto que produce el worker)",
-  "description": "Espejo del contrato de Recome-Notificaciones. Custodia: Recome-Notificaciones. El worker solo produce canal=mail sin adjunto ni callback.",
+  "description": "Espejo del contrato de Recome-Notificaciones. Custodia: Recome-Notificaciones. El worker produce canal=mail, o canal=push con el mail como respaldo (si la suscripción push ya no existe). Sin adjunto ni callback.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id_mensaje", "canal", "destinatario", "mail", "contenido"],
+  "required": [
+    "id_mensaje",
+    "canal",
+    "destinatario",
+    "mail",
+    "contenido"
+  ],
   "properties": {
-    "id_mensaje": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
-    "canal": { "const": "mail" },
-    "destinatario": { "type": "integer", "minimum": 1 },
-    "mail": { "type": "string", "format": "email" },
+    "id_mensaje": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "canal": {
+      "enum": [
+        "mail",
+        "push"
+      ]
+    },
+    "destinatario": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mail": {
+      "type": "string",
+      "format": "email"
+    },
     "contenido": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["titulo", "cuerpo"],
+      "required": [
+        "titulo",
+        "cuerpo"
+      ],
       "properties": {
-        "titulo": { "type": "string", "minLength": 1 },
-        "cuerpo": { "type": "string", "minLength": 1 }
+        "titulo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cuerpo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "push_sub": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "keys"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "keys": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "p256dh",
+                "auth"
+              ],
+              "properties": {
+                "p256dh": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "auth": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "canal": {
+            "const": "push"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "push_sub"
+        ],
+        "properties": {
+          "push_sub": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "canal": {
+            "const": "mail"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "push_sub": {
+            "type": "null"
+          }
+        }
       }
     }
-  }
+  ]
 }

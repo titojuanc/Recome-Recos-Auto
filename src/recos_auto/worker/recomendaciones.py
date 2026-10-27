@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from recos_auto.worker.config import ConfigWorker
 
@@ -42,6 +42,22 @@ class ErrorRecomendacion(Exception):
         self.motivo = motivo
 
 
+class PushKeys(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    p256dh: str = Field(min_length=1)
+    auth: str = Field(min_length=1)
+
+
+class PushSub(BaseModel):
+    """Suscripción Web Push del usuario (la guarda api-general al activar notificaciones)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint: str = Field(min_length=1)
+    keys: PushKeys
+
+
 @dataclass(frozen=True)
 class Recomendacion:
     recommendation_id: uuid.UUID
@@ -49,6 +65,9 @@ class Recomendacion:
     module: str
     titulo: str
     position: int
+    push_sub: PushSub | None = None
+    catalog_item_id: int | None = None
+    """Id del ítem en el catálogo (el de la ruta /catalogo/:itemId del frontend)."""
 
 
 class _Respuesta(BaseModel):
@@ -59,6 +78,18 @@ class _Respuesta(BaseModel):
     module: str
     titulo: str
     position: int
+    push_sub: dict | None = None
+    catalog_item_id: int | None = None
+
+
+def _push_sub_valida(crudo: dict | None) -> PushSub | None:
+    """Una suscripción mal formada no invalida la recomendación: el aviso sale por mail."""
+    if not crudo:
+        return None
+    try:
+        return PushSub.model_validate(crudo)
+    except ValidationError:
+        return None
 
 
 def clasificar_estado(estado: int) -> tuple[Clase, str]:
@@ -115,4 +146,6 @@ class ClienteRecomendaciones:
             module=datos.module,
             titulo=titulo,
             position=datos.position,
+            push_sub=_push_sub_valida(datos.push_sub),
+            catalog_item_id=datos.catalog_item_id,
         )
