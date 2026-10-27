@@ -8,8 +8,13 @@ Header: `X-Internal-API-Key: <API_GENERAL_API_KEY>`
 
 ## 200
 ```json
-{ "recommendation_id": "uuid", "item_id": "uuid", "module": "peliculas", "titulo": "…", "position": 1 }
+{ "recommendation_id": "uuid", "item_id": "uuid", "module": "peliculas", "titulo": "…", "position": 1, "catalog_item_id": 123,
+  "push_sub": { "endpoint": "https://…", "keys": { "p256dh": "…", "auth": "…" } } }
 ```
+
+`catalog_item_id` es el id del ítem en el catálogo (el de `/catalogo/:itemId` en el frontend); `item_id` es el UUID del motor de recomendaciones y **no** sirve para armar el link. Si falta, el worker cae en `item_id`.
+
+`push_sub` es opcional (ausente o `null` si el usuario no activó las notificaciones push). Si viene, el worker publica `canal=push` con el mail como respaldo; si viene mal formado se ignora y el aviso sale por mail.
 
 ## Errores y tratamiento
 | Código | Origen | Tratamiento del worker |

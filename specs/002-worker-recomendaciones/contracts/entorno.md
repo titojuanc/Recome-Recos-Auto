@@ -26,7 +26,8 @@ Los valores son de ejemplo; los secretos solo por entorno. Si falta alguna oblig
 | `BREAKER_MAX_HOLD_S` | `1500` | Máximo de retención de un mensaje sin confirmar. Debe ser < 1800 (el `consumer_timeout` por defecto de RabbitMQ es 30 min); si no, el arranque falla con código 78. |
 | `NOTIF_TITULO_TEMPLATE` | `Tu recomendación de hoy: {titulo}` | Variables: `titulo`, `modulo`. |
 | `NOTIF_CUERPO_TEMPLATE` | `Hoy te recomendamos {que_es}: {titulo}. Mirala acá: {url}` | Variables: `titulo`, `modulo`, `que_es`, `url`. |
-| `NOTIF_URL_TEMPLATE` | `https://recome.example/{modulo}/{item_id}` | Provisional; la página no existe aún. |
+| `NOTIF_CUERPO_PUSH_TEMPLATE` | `Hoy te recomendamos {que_es}: {titulo}.` | Cuerpo del aviso push (el link va en `url`). Variables: `titulo`, `modulo`, `que_es`. |
+| `NOTIF_URL_TEMPLATE` | `https://recome.example/catalogo/{item_id}` | Debe apuntar al dominio real del frontend (ruta `/catalogo/:itemId`). |
 | `SHUTDOWN_TIMEOUT_S` | `25` | Plazo de apagado. |
 | `SUMMARY_INTERVAL_S` | `60` | Período del resumen de contadores. |
 | `LOG_LEVEL` | `INFO` | |

@@ -19,11 +19,13 @@ from recos_auto.common.config import (
 
 TITULO_DEFECTO = "Tu recomendación de hoy: {titulo}"
 CUERPO_DEFECTO = "Hoy te recomendamos {que_es}: {titulo}. Mirala acá: {url}"
-URL_DEFECTO = "https://recome.example/{modulo}/{item_id}"
+CUERPO_PUSH_DEFECTO = "Hoy te recomendamos {que_es}: {titulo}."
+URL_DEFECTO = "https://recome.example/catalogo/{item_id}"
 
 # Variables que admite cada plantilla.
 CAMPOS_TITULO = {"titulo", "modulo"}
 CAMPOS_CUERPO = {"titulo", "modulo", "que_es", "url"}
+CAMPOS_CUERPO_PUSH = {"titulo", "modulo", "que_es"}
 CAMPOS_URL = {"modulo", "item_id"}
 
 # El `consumer_timeout` por defecto de RabbitMQ es 30 min: una retención mayor cierra el canal.
@@ -57,6 +59,7 @@ class ConfigWorker:
     breaker_max_hold_s: float = 1500.0
     notif_titulo_template: str = TITULO_DEFECTO
     notif_cuerpo_template: str = CUERPO_DEFECTO
+    notif_cuerpo_push_template: str = CUERPO_PUSH_DEFECTO
     notif_url_template: str = URL_DEFECTO
     shutdown_timeout_s: float = 25.0
     summary_interval_s: float = 60.0
@@ -143,6 +146,12 @@ class ConfigWorker:
             "notif_cuerpo_template",
             lambda v: _campos_validos(v, CAMPOS_CUERPO),
             f"solo admite {sorted(CAMPOS_CUERPO)}",
+        )
+        texto(
+            "NOTIF_CUERPO_PUSH_TEMPLATE",
+            "notif_cuerpo_push_template",
+            lambda v: _campos_validos(v, CAMPOS_CUERPO_PUSH),
+            f"solo admite {sorted(CAMPOS_CUERPO_PUSH)}",
         )
         texto(
             "NOTIF_URL_TEMPLATE",

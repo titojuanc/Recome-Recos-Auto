@@ -151,3 +151,38 @@ def test_limpiar_titulo():
     assert len(largo) == 120
     assert largo.endswith("…")
     assert limpiar_titulo("<b>Ñandú & Co</b>") == "<b>Ñandú & Co</b>"
+
+
+def _respuesta_con(**extra):
+    cuerpo = {
+        "recommendation_id": str(RID),
+        "item_id": str(ITEM),
+        "module": "peliculas",
+        "titulo": "Matrix",
+        "position": 1,
+        **extra,
+    }
+    return lambda request: httpx.Response(200, json=cuerpo)
+
+
+def test_push_sub_y_catalog_item_id_se_leen_de_la_respuesta():
+    handler = _respuesta_con(
+        catalog_item_id=55,
+        push_sub={"endpoint": "https://p.example/x", "keys": {"p256dh": "a", "auth": "b"}},
+    )
+    rec = _cliente(handler).obtener(RID, "peliculas")
+    assert rec.catalog_item_id == 55
+    assert rec.push_sub.endpoint == "https://p.example/x"
+
+
+def test_sin_push_sub_ni_catalog_item_id_siguen_siendo_none():
+    rec = _cliente(_respuesta_con()).obtener(RID, "peliculas")
+    assert rec.push_sub is None
+    assert rec.catalog_item_id is None
+
+
+def test_push_sub_mal_formada_se_ignora_y_no_invalida_la_recomendacion():
+    handler = _respuesta_con(push_sub={"endpoint": "", "keys": {}})
+    rec = _cliente(handler).obtener(RID, "peliculas")
+    assert rec.push_sub is None
+    assert rec.titulo == "Matrix"
