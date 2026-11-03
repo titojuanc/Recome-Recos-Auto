@@ -68,6 +68,8 @@ class Recomendacion:
     push_sub: PushSub | None = None
     catalog_item_id: int | None = None
     """Id del ítem en el catálogo (el de la ruta /catalogo/:itemId del frontend)."""
+    mail_enabled: bool = True
+    """False si el usuario apagó el mail: no se manda mail, ni siquiera como respaldo del push."""
 
 
 class _Respuesta(BaseModel):
@@ -80,6 +82,7 @@ class _Respuesta(BaseModel):
     position: int
     push_sub: dict | None = None
     catalog_item_id: int | None = None
+    mail_enabled: bool = True  # api-general viejo no lo manda: se asume el comportamiento anterior
 
 
 def _push_sub_valida(crudo: dict | None) -> PushSub | None:
@@ -148,4 +151,5 @@ class ClienteRecomendaciones:
             position=datos.position,
             push_sub=_push_sub_valida(datos.push_sub),
             catalog_item_id=datos.catalog_item_id,
+            mail_enabled=datos.mail_enabled,
         )

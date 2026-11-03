@@ -45,8 +45,9 @@ class Notificacion(BaseModel):
     id_mensaje: int = Field(ge=1, le=_MASCARA_63_BITS)
     canal: Literal["mail", "push"] = "mail"
     destinatario: int = Field(ge=1)
-    # Con canal=push, `mail` es el respaldo si la suscripción ya no existe (404/410).
-    mail: EmailStr
+    # Con canal=push, `mail` es el respaldo si la suscripción ya no existe (404/410); va vacío
+    # cuando el usuario apagó el mail.
+    mail: EmailStr | None = None
     push_sub: PushSub | None = None
     contenido: Contenido
 
@@ -56,6 +57,8 @@ class Notificacion(BaseModel):
             raise ValueError("canal 'push' requiere push_sub")
         if self.canal == "mail" and self.push_sub is not None:
             raise ValueError("canal 'mail' no admite push_sub")
+        if self.canal == "mail" and self.mail is None:
+            raise ValueError("canal 'mail' requiere mail")
         return self
 
 
@@ -80,7 +83,7 @@ def armar_notificacion(
             id_mensaje=id_mensaje,
             canal="push",
             destinatario=mensaje.user_id,
-            mail=mensaje.email,
+            mail=mensaje.email if recomendacion.mail_enabled else None,
             push_sub=recomendacion.push_sub,
             contenido=Contenido(titulo=titulo, cuerpo=cuerpo, url=url),
         )

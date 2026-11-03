@@ -10,7 +10,12 @@ import pytest
 
 from recos_auto.common.mensajes import MensajeUsuario, message_id_para
 from recos_auto.worker.config import ConfigWorker
-from recos_auto.worker.notificacion import Notificacion, armar_notificacion, id_mensaje_para
+from recos_auto.worker.notificacion import (
+    Contenido,
+    Notificacion,
+    armar_notificacion,
+    id_mensaje_para,
+)
 from recos_auto.worker.recomendaciones import PushKeys, PushSub, Recomendacion
 
 BASE = {
@@ -221,4 +226,20 @@ def test_canal_push_sin_suscripcion_es_invalido():
             destinatario=1,
             mail="a@b.com",
             contenido={"titulo": "t", "cuerpo": "c"},
+        )
+
+
+def test_con_el_mail_apagado_el_push_va_sin_mail_de_respaldo():
+    n = armar_notificacion(_mensaje(), _rec_push(mail_enabled=False), _cfg())
+    assert n.canal == "push"
+    assert n.mail is None
+    jsonschema.validate(n.model_dump(mode="json", exclude_none=True), SCHEMA)
+
+
+def test_con_el_mail_apagado_y_sin_push_no_se_arma_un_aviso_por_mail():
+    with pytest.raises(ValueError):
+        Notificacion(
+            id_mensaje=1,
+            destinatario=5,
+            contenido=Contenido(titulo="t", cuerpo="c"),
         )

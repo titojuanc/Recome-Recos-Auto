@@ -2,14 +2,13 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://recome.local/schemas/mensaje-notificacion.v1.json",
   "title": "MensajeNotificacion (subconjunto que produce el worker)",
-  "description": "Espejo del contrato de Recome-Notificaciones. Custodia: Recome-Notificaciones. El worker produce canal=mail, o canal=push con el mail como respaldo (si la suscripción push ya no existe). Sin adjunto ni callback.",
+  "description": "Espejo del contrato de Recome-Notificaciones. Custodia: Recome-Notificaciones. El worker produce canal=mail, o canal=push con el mail como respaldo (si la suscripción push ya no existe) o sin mail si el usuario lo apagó. Sin adjunto ni callback.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "id_mensaje",
     "canal",
     "destinatario",
-    "mail",
     "contenido"
   ],
   "properties": {
@@ -126,6 +125,9 @@
         }
       },
       "then": {
+        "required": [
+          "mail"
+        ],
         "properties": {
           "push_sub": {
             "type": "null"
