@@ -14,7 +14,7 @@ Header: `X-Internal-API-Key: <API_GENERAL_API_KEY>`
 
 `catalog_item_id` es el id del ítem en el catálogo (el de `/catalogo/:itemId` en el frontend); `item_id` es el UUID del motor de recomendaciones y **no** sirve para armar el link. Si falta, el worker cae en `item_id`.
 
-`push_sub` es opcional (ausente o `null` si el usuario no activó las notificaciones push). Si viene, el worker publica `canal=push` con el mail como respaldo; si viene mal formado se ignora y el aviso sale por mail.
+`push_sub` es opcional (ausente o `null` si el usuario no activó las notificaciones push). Si viene, el worker publica un aviso `canal=push` y, si el usuario tiene el mail activo (`mail_enabled`), otro aviso `canal=mail` independiente (el push no lleva mail de respaldo); si viene mal formado se ignora y el aviso sale solo por mail.
 
 ## Errores y tratamiento
 | Código | Origen | Tratamiento del worker |

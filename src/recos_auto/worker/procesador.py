@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from recos_auto.common.mensajes import MensajeUsuario
 from recos_auto.worker.config import ConfigWorker
-from recos_auto.worker.notificacion import Notificacion, armar_notificacion
+from recos_auto.worker.notificacion import Notificacion, armar_notificaciones
 from recos_auto.worker.publicador import ErrorPublicacion
 from recos_auto.worker.recomendaciones import ErrorRecomendacion, Recomendacion
 
@@ -53,12 +53,15 @@ def procesar(
         return Resultado(SIN_RECOMENDACION, "sin_canal_activo")
 
     try:
-        notificacion = armar_notificacion(mensaje, recomendacion, cfg)
+        notificaciones = armar_notificaciones(mensaje, recomendacion, cfg)
     except (ValidationError, KeyError, IndexError, ValueError):
         return Resultado(INVALIDO, "no_se_pudo_armar_la_notificacion")
 
     try:
-        publicar(notificacion)
+        # Un aviso por canal activo. Si uno falla se reintenta todo: los ids son deterministas y
+        # Notificaciones descarta el que ya salió.
+        for notificacion in notificaciones:
+            publicar(notificacion)
     except ErrorPublicacion as exc:
         return Resultado(TRANSITORIO, str(exc))
     return Resultado(NOTIFICADO)

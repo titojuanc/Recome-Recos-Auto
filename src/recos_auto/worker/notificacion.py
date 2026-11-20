@@ -86,9 +86,34 @@ class Notificacion(BaseModel):
         return self
 
 
-def armar_notificacion(
+def id_mensaje_mail_para(message_id: uuid.UUID) -> int:
+    """Id del aviso por mail cuando el mismo usuario recibe también el push.
+
+    Notificaciones deduplica por `id_mensaje`: si el mail compartiera el id del push se descartaría.
+    Determinista, para que un reintento no duplique el envío.
+    """
+    return id_mensaje_para(uuid.uuid5(message_id, "mail"))
+
+
+def armar_notificaciones(
     mensaje: MensajeUsuario, recomendacion: Recomendacion, cfg: ConfigWorker
-) -> Notificacion:
+) -> list[Notificacion]:
+    """Un aviso por cada canal activo del usuario; uno no anula al otro.
+
+    Con push y mail activos salen dos mensajes independientes (el push ya no lleva el mail de
+    respaldo: lo enviaría duplicado). Con un solo canal activo, sale un solo mensaje.
+    """
+    if recomendacion.push_sub is None:
+        return [_armar_mail(mensaje, recomendacion, cfg, id_mensaje_para(mensaje.message_id))]
+    avisos = [_armar_push(mensaje, recomendacion, cfg)]
+    if recomendacion.mail_enabled:
+        avisos.append(
+            _armar_mail(mensaje, recomendacion, cfg, id_mensaje_mail_para(mensaje.message_id))
+        )
+    return avisos
+
+
+def _datos_comunes(mensaje: MensajeUsuario, recomendacion: Recomendacion, cfg: ConfigWorker):
     """FR-025: `mail` y `destinatario` salen del MISMO mensaje que originó la recomendación."""
     nombre_modulo, que_es = _MODULOS[mensaje.modulo]
     # El frontend resuelve /catalogo/:itemId con el id del catálogo; `item_id` (UUID del motor de
@@ -100,22 +125,31 @@ def armar_notificacion(
         TIPO_RECOMENDACION_DIA,
     )
     titulo = cfg.notif_titulo_template.format(titulo=recomendacion.titulo, modulo=nombre_modulo)
-    id_mensaje = id_mensaje_para(mensaje.message_id)
+    return titulo, nombre_modulo, que_es, url
 
-    if recomendacion.push_sub is not None:
-        # Push primero; el link va en `url` (no en el cuerpo) y el mail queda de respaldo.
-        cuerpo = cfg.notif_cuerpo_push_template.format(
-            titulo=recomendacion.titulo, modulo=nombre_modulo, que_es=que_es
-        )
-        return Notificacion(
-            id_mensaje=id_mensaje,
-            canal="push",
-            destinatario=mensaje.user_id,
-            mail=mensaje.email if recomendacion.mail_enabled else None,
-            push_sub=recomendacion.push_sub,
-            contenido=Contenido(titulo=titulo, cuerpo=cuerpo, url=url),
-        )
 
+def _armar_push(
+    mensaje: MensajeUsuario, recomendacion: Recomendacion, cfg: ConfigWorker
+) -> Notificacion:
+    titulo, nombre_modulo, que_es, url = _datos_comunes(mensaje, recomendacion, cfg)
+    # El link va en `url` (no en el cuerpo). Sin mail de respaldo: si el usuario lo tiene activo,
+    # recibe su propio aviso por mail (ver `armar_notificaciones`).
+    cuerpo = cfg.notif_cuerpo_push_template.format(
+        titulo=recomendacion.titulo, modulo=nombre_modulo, que_es=que_es
+    )
+    return Notificacion(
+        id_mensaje=id_mensaje_para(mensaje.message_id),
+        canal="push",
+        destinatario=mensaje.user_id,
+        push_sub=recomendacion.push_sub,
+        contenido=Contenido(titulo=titulo, cuerpo=cuerpo, url=url),
+    )
+
+
+def _armar_mail(
+    mensaje: MensajeUsuario, recomendacion: Recomendacion, cfg: ConfigWorker, id_mensaje: int
+) -> Notificacion:
+    titulo, nombre_modulo, que_es, url = _datos_comunes(mensaje, recomendacion, cfg)
     cuerpo = cfg.notif_cuerpo_template.format(
         titulo=recomendacion.titulo, modulo=nombre_modulo, que_es=que_es, url=url
     )

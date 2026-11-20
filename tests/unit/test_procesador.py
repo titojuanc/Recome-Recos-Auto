@@ -93,3 +93,29 @@ def test_sin_push_y_con_el_mail_apagado_no_se_notifica_y_se_da_por_atendido():
     assert r.tipo == p.SIN_RECOMENDACION
     assert r.motivo == "sin_canal_activo"
     assert enviados == []
+
+
+def _con_push_y_mail(rid, modulo):
+    from recos_auto.worker.recomendaciones import PushKeys, PushSub
+
+    sub = PushSub(endpoint="https://push.example.test/abc", keys=PushKeys(p256dh="p", auth="a"))
+    return Recomendacion(rid, uuid.UUID(int=999), modulo, "Matrix", 1, push_sub=sub)
+
+
+def test_con_push_y_mail_activos_se_publican_los_dos_canales():
+    enviados = []
+    r = p.procesar(_cuerpo(), CFG, _con_push_y_mail, enviados.append)
+    assert r.tipo == p.NOTIFICADO
+    assert [n.canal for n in enviados] == ["push", "mail"]
+    assert len({n.id_mensaje for n in enviados}) == 2
+
+
+def test_si_falla_el_segundo_canal_es_transitorio_y_se_reintenta_todo():
+    enviados = []
+
+    def segunda_falla(n):
+        if enviados:
+            raise ErrorPublicacion("sin confirmar")
+        enviados.append(n)
+
+    assert p.procesar(_cuerpo(), CFG, _con_push_y_mail, segunda_falla).tipo == p.TRANSITORIO

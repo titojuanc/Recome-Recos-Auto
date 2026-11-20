@@ -13,8 +13,9 @@ from recos_auto.worker.config import ConfigWorker
 from recos_auto.worker.notificacion import (
     Contenido,
     Notificacion,
-    armar_notificacion,
+    armar_notificaciones,
     con_origen,
+    id_mensaje_mail_para,
     id_mensaje_para,
 )
 from recos_auto.worker.recomendaciones import PushKeys, PushSub, Recomendacion
@@ -57,6 +58,10 @@ def _rec(titulo="Matrix", modulo="peliculas", rid=5):
     )
 
 
+def _primera(mensaje, rec, cfg):
+    return armar_notificaciones(mensaje, rec, cfg)[0]
+
+
 def _cfg(**extra):
     return ConfigWorker.from_env(dict(BASE, **extra))
 
@@ -83,7 +88,7 @@ def test_id_mensaje_nunca_es_cero():
 
 
 def test_contenido_por_defecto_peliculas():
-    n = armar_notificacion(_mensaje(modulo="peliculas"), _rec(), _cfg())
+    n = _primera(_mensaje(modulo="peliculas"), _rec(), _cfg())
     assert n.canal == "mail"
     assert n.contenido.titulo == "Tu recomendación de hoy: Matrix"
     assert "una película" in n.contenido.cuerpo
@@ -92,7 +97,7 @@ def test_contenido_por_defecto_peliculas():
 
 
 def test_contenido_por_defecto_juegos():
-    n = armar_notificacion(_mensaje(modulo="juegos"), _rec(titulo="Zelda", modulo="juegos"), _cfg())
+    n = _primera(_mensaje(modulo="juegos"), _rec(titulo="Zelda", modulo="juegos"), _cfg())
     assert "un juego" in n.contenido.cuerpo
     assert "película" not in n.contenido.cuerpo
     assert "/catalogo/" in n.contenido.cuerpo
@@ -100,27 +105,27 @@ def test_contenido_por_defecto_juegos():
 
 def test_mail_y_destinatario_salen_del_mismo_mensaje():
     mensaje = _mensaje(user_id=42)
-    n = armar_notificacion(mensaje, _rec(rid=42), _cfg())
+    n = _primera(mensaje, _rec(rid=42), _cfg())
     assert n.mail == mensaje.email
     assert n.destinatario == mensaje.user_id == 42
     assert n.id_mensaje == id_mensaje_para(mensaje.message_id)
 
 
 def test_el_idioma_se_ignora():
-    a = armar_notificacion(_mensaje(idioma="en"), _rec(), _cfg())
-    b = armar_notificacion(_mensaje(idioma=None), _rec(), _cfg())
-    c = armar_notificacion(_mensaje(idioma="es"), _rec(), _cfg())
+    a = _primera(_mensaje(idioma="en"), _rec(), _cfg())
+    b = _primera(_mensaje(idioma=None), _rec(), _cfg())
+    c = _primera(_mensaje(idioma="es"), _rec(), _cfg())
     assert a.contenido == b.contenido == c.contenido
 
 
 def test_el_cuerpo_por_defecto_no_contiene_el_nombre():
-    n = armar_notificacion(_mensaje(nombre="Ana Maria Perez"), _rec(), _cfg())
+    n = _primera(_mensaje(nombre="Ana Maria Perez"), _rec(), _cfg())
     assert "Ana" not in n.contenido.cuerpo
     assert "Perez" not in n.contenido.titulo
 
 
 def test_titulo_con_llaves_y_marcado_no_rompe_las_plantillas():
-    n = armar_notificacion(_mensaje(), _rec(titulo="{x} <b>Ñandú</b> {0}"), _cfg())
+    n = _primera(_mensaje(), _rec(titulo="{x} <b>Ñandú</b> {0}"), _cfg())
     assert "{x} <b>Ñandú</b> {0}" in n.contenido.titulo
 
 
@@ -130,13 +135,13 @@ def test_plantillas_configurables():
         NOTIF_CUERPO_TEMPLATE="{que_es} -> {url}",
         NOTIF_URL_TEMPLATE="https://x.test/{modulo}/{item_id}",
     )
-    n = armar_notificacion(_mensaje(), _rec(), cfg)
+    n = _primera(_mensaje(), _rec(), cfg)
     assert n.contenido.titulo == "Hoy: Matrix (película)"
     assert n.contenido.cuerpo == f"una película -> https://x.test/peliculas/{uuid.UUID(int=99)}?n=recomendacion_dia"
 
 
 def test_notificacion_valida_contra_el_schema():
-    n = armar_notificacion(_mensaje(), _rec(), _cfg())
+    n = _primera(_mensaje(), _rec(), _cfg())
     jsonschema.validate(n.model_dump(mode="json"), SCHEMA)
 
 
@@ -151,14 +156,14 @@ def test_notificacion_valida_contra_el_schema():
     ],
 )
 def test_el_schema_rechaza_notificaciones_invalidas(roto):
-    base = armar_notificacion(_mensaje(), _rec(), _cfg()).model_dump(mode="json")
+    base = _primera(_mensaje(), _rec(), _cfg()).model_dump(mode="json")
     datos = {**base, **roto}
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(datos, SCHEMA)
 
 
 def test_el_schema_exige_el_mail():
-    base = armar_notificacion(_mensaje(), _rec(), _cfg()).model_dump(mode="json")
+    base = _primera(_mensaje(), _rec(), _cfg()).model_dump(mode="json")
     del base["mail"]
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(base, SCHEMA)
@@ -192,36 +197,36 @@ def _rec_push(**extra):
     )
 
 
-def test_con_suscripcion_push_el_aviso_es_push_con_mail_de_respaldo():
-    n = armar_notificacion(_mensaje(), _rec_push(), _cfg())
+def test_con_suscripcion_push_el_aviso_es_push_sin_mail_de_respaldo():
+    n = _primera(_mensaje(), _rec_push(), _cfg())
     assert n.canal == "push"
     assert n.push_sub == PUSH_SUB
-    assert n.mail == "u5@example.com"
+    assert n.mail is None  # el mail sale como aviso propio, no como respaldo
     assert "Matrix" in n.contenido.cuerpo
     assert "http" not in n.contenido.cuerpo  # el link va en `url`, no en el texto
     assert n.contenido.url.startswith("https://recome.example/catalogo/")
 
 
 def test_sin_suscripcion_push_el_aviso_sigue_siendo_mail():
-    n = armar_notificacion(_mensaje(), _rec(), _cfg())
+    n = _primera(_mensaje(), _rec(), _cfg())
     assert n.canal == "mail"
     assert n.push_sub is None
     assert n.contenido.url is None
 
 
 def test_el_link_usa_el_id_del_catalogo_cuando_api_general_lo_manda():
-    n = armar_notificacion(_mensaje(), _rec_push(catalog_item_id=1234), _cfg())
+    n = _primera(_mensaje(), _rec_push(catalog_item_id=1234), _cfg())
     assert n.contenido.url == "https://recome.example/catalogo/1234?n=recomendacion_dia"
 
 
 def test_la_notificacion_lleva_el_tipo_para_las_analytics():
-    assert armar_notificacion(_mensaje(), _rec(), _cfg()).tipo == "recomendacion_dia"
-    push = armar_notificacion(_mensaje(), _rec_push(), _cfg())
+    assert _primera(_mensaje(), _rec(), _cfg()).tipo == "recomendacion_dia"
+    push = _primera(_mensaje(), _rec_push(), _cfg())
     assert push.model_dump(mode="json")["tipo"] == "recomendacion_dia"
 
 
 def test_el_link_del_mail_tambien_cuenta_el_clic():
-    n = armar_notificacion(_mensaje(), _rec(), _cfg())
+    n = _primera(_mensaje(), _rec(), _cfg())
     assert "?n=recomendacion_dia" in n.contenido.cuerpo
 
 
@@ -240,8 +245,8 @@ def test_con_origen_conserva_la_consulta_y_el_fragmento(url, esperada):
 
 
 def test_notificacion_push_valida_contra_el_schema():
-    n = armar_notificacion(_mensaje(), _rec_push(catalog_item_id=7), _cfg())
-    jsonschema.validate(n.model_dump(mode="json", exclude_none=False), SCHEMA)
+    n = _primera(_mensaje(), _rec_push(catalog_item_id=7), _cfg())
+    jsonschema.validate(n.model_dump(mode="json", exclude_none=True), SCHEMA)
 
 
 def test_canal_push_sin_suscripcion_es_invalido():
@@ -256,7 +261,7 @@ def test_canal_push_sin_suscripcion_es_invalido():
 
 
 def test_con_el_mail_apagado_el_push_va_sin_mail_de_respaldo():
-    n = armar_notificacion(_mensaje(), _rec_push(mail_enabled=False), _cfg())
+    n = _primera(_mensaje(), _rec_push(mail_enabled=False), _cfg())
     assert n.canal == "push"
     assert n.mail is None
     jsonschema.validate(n.model_dump(mode="json", exclude_none=True), SCHEMA)
@@ -269,3 +274,37 @@ def test_con_el_mail_apagado_y_sin_push_no_se_arma_un_aviso_por_mail():
             destinatario=5,
             contenido=Contenido(titulo="t", cuerpo="c"),
         )
+
+
+def test_con_push_y_mail_activos_salen_dos_avisos_independientes():
+    mensaje = _mensaje()
+    push, mail = armar_notificaciones(mensaje, _rec_push(), _cfg())
+    assert (push.canal, mail.canal) == ("push", "mail")
+    assert push.push_sub == PUSH_SUB and push.mail is None
+    assert mail.push_sub is None and mail.mail == "u5@example.com"
+    assert "?n=recomendacion_dia" in mail.contenido.cuerpo
+    assert push.contenido.url.endswith("?n=recomendacion_dia")
+    assert push.tipo == mail.tipo == "recomendacion_dia"
+    for n in (push, mail):
+        jsonschema.validate(n.model_dump(mode="json", exclude_none=True), SCHEMA)
+
+
+def test_los_dos_avisos_tienen_ids_distintos_y_deterministas():
+    mensaje = _mensaje()
+    push, mail = armar_notificaciones(mensaje, _rec_push(), _cfg())
+    assert push.id_mensaje == id_mensaje_para(mensaje.message_id)
+    assert mail.id_mensaje == id_mensaje_mail_para(mensaje.message_id)
+    assert push.id_mensaje != mail.id_mensaje
+    assert 1 <= mail.id_mensaje <= LIMITE
+    assert [n.id_mensaje for n in armar_notificaciones(mensaje, _rec_push(), _cfg())] == [
+        push.id_mensaje,
+        mail.id_mensaje,
+    ]
+
+
+def test_solo_push_sale_un_aviso_y_solo_mail_conserva_su_id():
+    mensaje = _mensaje()
+    assert len(armar_notificaciones(mensaje, _rec_push(mail_enabled=False), _cfg())) == 1
+    [mail] = armar_notificaciones(mensaje, _rec(), _cfg())
+    assert mail.canal == "mail"
+    assert mail.id_mensaje == id_mensaje_para(mensaje.message_id)
