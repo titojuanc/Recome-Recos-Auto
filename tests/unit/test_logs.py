@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import warnings
 
 import pytest
 
@@ -15,6 +16,7 @@ def salida():
     configurar_logs("INFO", flujo=flujo)
     yield flujo
     logging.getLogger().handlers.clear()
+    logging.captureWarnings(False)
 
 
 def _lineas(flujo: io.StringIO) -> list[dict]:
@@ -74,3 +76,12 @@ def test_acepta_acentos_y_emojis_en_campos_permitidos(salida):
     log = logging.getLogger("recos_auto.test")
     evento(log, "x", motivo="módulo ✔")
     assert _lineas(salida)[0]["motivo"] == "módulo ✔"
+
+
+def test_los_warnings_de_python_salen_como_json(salida):
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        warnings.warn("BlockingConnection is deprecated", DeprecationWarning, stacklevel=1)
+    [linea] = _lineas(salida)
+    assert linea["level"] == "WARNING"
+    assert "BlockingConnection is deprecated" in linea["evento"]

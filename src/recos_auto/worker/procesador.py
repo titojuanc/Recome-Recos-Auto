@@ -48,6 +48,10 @@ def procesar(
             return Resultado(INVALIDO, exc.motivo)
         return Resultado(TRANSITORIO, exc.motivo)
 
+    if recomendacion.push_sub is None and not recomendacion.mail_enabled:
+        # El usuario apagó el mail y no tiene push disponible: no hay por dónde avisarle.
+        return Resultado(SIN_RECOMENDACION, "sin_canal_activo")
+
     try:
         notificacion = armar_notificacion(mensaje, recomendacion, cfg)
     except (ValidationError, KeyError, IndexError, ValueError):

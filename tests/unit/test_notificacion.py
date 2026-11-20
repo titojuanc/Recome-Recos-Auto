@@ -10,8 +10,14 @@ import pytest
 
 from recos_auto.common.mensajes import MensajeUsuario, message_id_para
 from recos_auto.worker.config import ConfigWorker
-from recos_auto.worker.notificacion import Notificacion, armar_notificacion, id_mensaje_para
-from recos_auto.worker.recomendaciones import Recomendacion
+from recos_auto.worker.notificacion import (
+    Contenido,
+    Notificacion,
+    armar_notificacion,
+    con_origen,
+    id_mensaje_para,
+)
+from recos_auto.worker.recomendaciones import PushKeys, PushSub, Recomendacion
 
 BASE = {
     "API_GENERAL_BASE_URL": "http://api.test/api/v1",
@@ -82,14 +88,14 @@ def test_contenido_por_defecto_peliculas():
     assert n.contenido.titulo == "Tu recomendación de hoy: Matrix"
     assert "una película" in n.contenido.cuerpo
     assert "Matrix" in n.contenido.cuerpo
-    assert f"https://recome.example/peliculas/{uuid.UUID(int=99)}" in n.contenido.cuerpo
+    assert f"https://recome.example/catalogo/{uuid.UUID(int=99)}" in n.contenido.cuerpo
 
 
 def test_contenido_por_defecto_juegos():
     n = armar_notificacion(_mensaje(modulo="juegos"), _rec(titulo="Zelda", modulo="juegos"), _cfg())
     assert "un juego" in n.contenido.cuerpo
     assert "película" not in n.contenido.cuerpo
-    assert "/juegos/" in n.contenido.cuerpo
+    assert "/catalogo/" in n.contenido.cuerpo
 
 
 def test_mail_y_destinatario_salen_del_mismo_mensaje():
@@ -126,7 +132,7 @@ def test_plantillas_configurables():
     )
     n = armar_notificacion(_mensaje(), _rec(), cfg)
     assert n.contenido.titulo == "Hoy: Matrix (película)"
-    assert n.contenido.cuerpo == f"una película -> https://x.test/peliculas/{uuid.UUID(int=99)}"
+    assert n.contenido.cuerpo == f"una película -> https://x.test/peliculas/{uuid.UUID(int=99)}?n=recomendacion_dia"
 
 
 def test_notificacion_valida_contra_el_schema():
@@ -168,4 +174,98 @@ def test_el_modelo_prohibe_campos_extra():
                 "contenido": {"titulo": "t", "cuerpo": "c"},
                 "adjunto": {},
             }
+        )
+
+
+PUSH_SUB = PushSub(endpoint="https://push.example.test/abc", keys=PushKeys(p256dh="p", auth="a"))
+
+
+def _rec_push(**extra):
+    return Recomendacion(
+        recommendation_id=uuid.UUID(int=5),
+        item_id=uuid.UUID(int=99),
+        module="peliculas",
+        titulo="Matrix",
+        position=1,
+        push_sub=PUSH_SUB,
+        **extra,
+    )
+
+
+def test_con_suscripcion_push_el_aviso_es_push_con_mail_de_respaldo():
+    n = armar_notificacion(_mensaje(), _rec_push(), _cfg())
+    assert n.canal == "push"
+    assert n.push_sub == PUSH_SUB
+    assert n.mail == "u5@example.com"
+    assert "Matrix" in n.contenido.cuerpo
+    assert "http" not in n.contenido.cuerpo  # el link va en `url`, no en el texto
+    assert n.contenido.url.startswith("https://recome.example/catalogo/")
+
+
+def test_sin_suscripcion_push_el_aviso_sigue_siendo_mail():
+    n = armar_notificacion(_mensaje(), _rec(), _cfg())
+    assert n.canal == "mail"
+    assert n.push_sub is None
+    assert n.contenido.url is None
+
+
+def test_el_link_usa_el_id_del_catalogo_cuando_api_general_lo_manda():
+    n = armar_notificacion(_mensaje(), _rec_push(catalog_item_id=1234), _cfg())
+    assert n.contenido.url == "https://recome.example/catalogo/1234?n=recomendacion_dia"
+
+
+def test_la_notificacion_lleva_el_tipo_para_las_analytics():
+    assert armar_notificacion(_mensaje(), _rec(), _cfg()).tipo == "recomendacion_dia"
+    push = armar_notificacion(_mensaje(), _rec_push(), _cfg())
+    assert push.model_dump(mode="json")["tipo"] == "recomendacion_dia"
+
+
+def test_el_link_del_mail_tambien_cuenta_el_clic():
+    n = armar_notificacion(_mensaje(), _rec(), _cfg())
+    assert "?n=recomendacion_dia" in n.contenido.cuerpo
+
+
+@pytest.mark.parametrize(
+    ("url", "esperada"),
+    [
+        ("https://x.test/catalogo/1", "https://x.test/catalogo/1?n=recomendacion_dia"),
+        ("https://x.test/c?tipo=juegos", "https://x.test/c?tipo=juegos&n=recomendacion_dia"),
+        ("https://x.test/c?n=otro&a=1", "https://x.test/c?a=1&n=recomendacion_dia"),
+        ("https://x.test/c#detalle", "https://x.test/c?n=recomendacion_dia#detalle"),
+        ("/catalogo/1", "/catalogo/1?n=recomendacion_dia"),
+    ],
+)
+def test_con_origen_conserva_la_consulta_y_el_fragmento(url, esperada):
+    assert con_origen(url, "recomendacion_dia") == esperada
+
+
+def test_notificacion_push_valida_contra_el_schema():
+    n = armar_notificacion(_mensaje(), _rec_push(catalog_item_id=7), _cfg())
+    jsonschema.validate(n.model_dump(mode="json", exclude_none=False), SCHEMA)
+
+
+def test_canal_push_sin_suscripcion_es_invalido():
+    with pytest.raises(ValueError):
+        Notificacion(
+            id_mensaje=1,
+            canal="push",
+            destinatario=1,
+            mail="a@b.com",
+            contenido={"titulo": "t", "cuerpo": "c"},
+        )
+
+
+def test_con_el_mail_apagado_el_push_va_sin_mail_de_respaldo():
+    n = armar_notificacion(_mensaje(), _rec_push(mail_enabled=False), _cfg())
+    assert n.canal == "push"
+    assert n.mail is None
+    jsonschema.validate(n.model_dump(mode="json", exclude_none=True), SCHEMA)
+
+
+def test_con_el_mail_apagado_y_sin_push_no_se_arma_un_aviso_por_mail():
+    with pytest.raises(ValueError):
+        Notificacion(
+            id_mensaje=1,
+            destinatario=5,
+            contenido=Contenido(titulo="t", cuerpo="c"),
         )

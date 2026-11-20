@@ -82,3 +82,14 @@ def test_el_motivo_no_filtra_datos_personales():
     r = p.procesar(_cuerpo(email="no-es-mail"), CFG, _ok, lambda n: None)
     assert "no-es-mail" not in r.motivo
     assert "Usuario" not in r.motivo
+
+
+def test_sin_push_y_con_el_mail_apagado_no_se_notifica_y_se_da_por_atendido():
+    enviados = []
+    sin_canal = lambda rid, modulo: Recomendacion(  # noqa: E731
+        rid, uuid.UUID(int=999), modulo, "Matrix", 1, mail_enabled=False
+    )
+    r = p.procesar(_cuerpo(), CFG, sin_canal, enviados.append)
+    assert r.tipo == p.SIN_RECOMENDACION
+    assert r.motivo == "sin_canal_activo"
+    assert enviados == []

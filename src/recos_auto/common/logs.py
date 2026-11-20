@@ -60,6 +60,9 @@ def configurar_logs(nivel: str = "INFO", flujo: TextIO | None = None) -> None:
     raiz.handlers.clear()
     raiz.addHandler(manejador)
     raiz.setLevel(nivel.upper())
+    # Los warnings de Python (p. ej. un DeprecationWarning de pika) salen como una línea JSON más,
+    # no como texto suelto en stderr: así toda la salida del proceso sigue siendo JSON.
+    logging.captureWarnings(True)
     for ruidoso in ("pika", "httpx", "httpcore"):
         logging.getLogger(ruidoso).setLevel(logging.WARNING)
 

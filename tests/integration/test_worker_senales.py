@@ -70,7 +70,10 @@ def test_sigterm_apaga_en_orden_y_los_logs_no_tienen_pii(
     for secreto in ("clave-super-secreta", "u1@example.com", "Usuario 1", "secreto"):
         assert secreto not in texto
     for linea in filter(None, texto.splitlines()):
-        json.loads(linea)  # todo log es JSON
+        try:
+            json.loads(linea)  # todo log es JSON
+        except json.JSONDecodeError:
+            pytest.fail(f"línea que no es JSON en la salida del worker: {linea!r}")
     # Nada se perdió: los 3 mensajes siguen en la cola (retenidos o devueltos) y no hay DLQ.
     assert profundidad(config_worker.users_queue) == 3
     assert profundidad(config_worker.dead_letter_queue) == 0
