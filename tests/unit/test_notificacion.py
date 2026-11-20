@@ -137,7 +137,8 @@ def test_plantillas_configurables():
     )
     n = _primera(_mensaje(), _rec(), cfg)
     assert n.contenido.titulo == "Hoy: Matrix (película)"
-    assert n.contenido.cuerpo == f"una película -> https://x.test/peliculas/{uuid.UUID(int=99)}?n=recomendacion_dia"
+    esperado_url = f"https://x.test/peliculas/{uuid.UUID(int=99)}?n=recomendacion_dia&m={n.id_mensaje}"
+    assert n.contenido.cuerpo == f"una película -> {esperado_url}"
 
 
 def test_notificacion_valida_contra_el_schema():
@@ -216,7 +217,9 @@ def test_sin_suscripcion_push_el_aviso_sigue_siendo_mail():
 
 def test_el_link_usa_el_id_del_catalogo_cuando_api_general_lo_manda():
     n = _primera(_mensaje(), _rec_push(catalog_item_id=1234), _cfg())
-    assert n.contenido.url == "https://recome.example/catalogo/1234?n=recomendacion_dia"
+    assert n.contenido.url == (
+        f"https://recome.example/catalogo/1234?n=recomendacion_dia&m={n.id_mensaje}"
+    )
 
 
 def test_la_notificacion_lleva_el_tipo_para_las_analytics():
@@ -283,10 +286,30 @@ def test_con_push_y_mail_activos_salen_dos_avisos_independientes():
     assert push.push_sub == PUSH_SUB and push.mail is None
     assert mail.push_sub is None and mail.mail == "u5@example.com"
     assert "?n=recomendacion_dia" in mail.contenido.cuerpo
-    assert push.contenido.url.endswith("?n=recomendacion_dia")
+    assert push.contenido.url.endswith(f"?n=recomendacion_dia&m={push.id_mensaje}")
     assert push.tipo == mail.tipo == "recomendacion_dia"
     for n in (push, mail):
         jsonschema.validate(n.model_dump(mode="json", exclude_none=True), SCHEMA)
+
+
+def test_cada_aviso_lleva_su_propio_id_en_el_link_para_contar_el_clic_sin_sesion():
+    push, mail = armar_notificaciones(_mensaje(), _rec_push(), _cfg())
+    assert f"m={push.id_mensaje}" in push.contenido.url
+    assert f"m={mail.id_mensaje}" in mail.contenido.cuerpo
+    assert f"m={push.id_mensaje}" not in mail.contenido.cuerpo
+    assert "n=recomendacion_dia" in push.contenido.url
+
+
+@pytest.mark.parametrize(
+    ("url", "esperada"),
+    [
+        ("/catalogo/1", "/catalogo/1?n=t&m=77"),
+        ("/c?a=1&m=5&n=x", "/c?a=1&n=t&m=77"),
+        ("/c#d", "/c?n=t&m=77#d"),
+    ],
+)
+def test_con_origen_agrega_el_id_del_mensaje(url, esperada):
+    assert con_origen(url, "t", 77) == esperada
 
 
 def test_los_dos_avisos_tienen_ids_distintos_y_deterministas():

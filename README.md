@@ -49,7 +49,7 @@ notificación por mail en la cola `notificaciones` (que declara Recome-Notificac
 python -m recos_auto.worker          # o: docker compose up --build worker
 ```
 
-- Cada notificación lleva `tipo: "recomendacion_dia"` y su link termina en `?n=recomendacion_dia`: Recome-Notificaciones cuenta el envío y el frontend el clic (analytics del admin, spec 013 de api-general). **Desplegar primero Recome-Notificaciones**: su contrato rechaza campos que no conoce, así que un `tipo` que llegue antes que su actualización va a dead-letter.
+- Cada notificación lleva `tipo: "recomendacion_dia"` y su link lleva `?n=recomendacion_dia&m=<id_mensaje>`: Recome-Notificaciones cuenta el envío y el frontend el clic, sin necesidad de sesión (cada aviso, push y mail, lleva su propio `m`) (analytics del admin, spec 013 de api-general). **Desplegar primero Recome-Notificaciones**: su contrato rechaza campos que no conoce, así que un `tipo` que llegue antes que su actualización va a dead-letter.
 - `WORKER_CONCURRENCY` (4): hilos, cada uno con su conexión y `prefetch=1`.
 - Circuito de corte: `BREAKER_FAILURES` (5, `0` lo desactiva), `BREAKER_BACKOFF_S`,
   `BREAKER_BACKOFF_MAX_S`, `BREAKER_MAX_HOLD_S` (1500, debe ser < 1800).
