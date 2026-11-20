@@ -216,7 +216,8 @@ def test_el_link_usa_el_id_del_catalogo_cuando_api_general_lo_manda():
 
 def test_la_notificacion_lleva_el_tipo_para_las_analytics():
     assert armar_notificacion(_mensaje(), _rec(), _cfg()).tipo == "recomendacion_dia"
-    assert armar_notificacion(_mensaje(), _rec_push(), _cfg()).model_dump(mode="json")["tipo"] == "recomendacion_dia"
+    push = armar_notificacion(_mensaje(), _rec_push(), _cfg())
+    assert push.model_dump(mode="json")["tipo"] == "recomendacion_dia"
 
 
 def test_el_link_del_mail_tambien_cuenta_el_clic():

@@ -42,7 +42,11 @@ def con_origen(url: str, tipo: str) -> str:
     Si la URL ya traía `n`, se reemplaza.
     """
     partes = urlsplit(url)
-    consulta = [par for par in parse_qsl(partes.query, keep_blank_values=True) if par[0] != PARAMETRO_ORIGEN]
+    consulta = [
+        par
+        for par in parse_qsl(partes.query, keep_blank_values=True)
+        if par[0] != PARAMETRO_ORIGEN
+    ]
     consulta.append((PARAMETRO_ORIGEN, tipo))
     return urlunsplit(partes._replace(query=urlencode(consulta)))
 
@@ -62,7 +66,7 @@ class Notificacion(BaseModel):
 
     id_mensaje: int = Field(ge=1, le=_MASCARA_63_BITS)
     canal: Literal["mail", "push"] = "mail"
-    # Para las analytics del admin (spec 013 de api-general): Recome-Notificaciones cuenta el envío con este tipo.
+    # Analytics del admin (spec 013 de api-general): Notificaciones cuenta el envío con este tipo.
     tipo: Literal["recomendacion_dia"] = TIPO_RECOMENDACION_DIA
     destinatario: int = Field(ge=1)
     # Con canal=push, `mail` es el respaldo si la suscripción ya no existe (404/410); va vacío
@@ -92,7 +96,8 @@ def armar_notificacion(
     destino_id = recomendacion.catalog_item_id or recomendacion.item_id
     # El mismo link (con `?n=`) va en el push y en el mail, para contar el clic en los dos canales.
     url = con_origen(
-        cfg.notif_url_template.format(modulo=mensaje.modulo, item_id=destino_id), TIPO_RECOMENDACION_DIA
+        cfg.notif_url_template.format(modulo=mensaje.modulo, item_id=destino_id),
+        TIPO_RECOMENDACION_DIA,
     )
     titulo = cfg.notif_titulo_template.format(titulo=recomendacion.titulo, modulo=nombre_modulo)
     id_mensaje = id_mensaje_para(mensaje.message_id)
