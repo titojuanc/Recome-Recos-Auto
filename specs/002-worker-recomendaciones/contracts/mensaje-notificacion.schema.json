@@ -23,6 +23,12 @@
         "push"
       ]
     },
+    "tipo": {
+      "description": "Tipo para las analytics del admin (spec 013 de api-general). Recome-Notificaciones cuenta cada envío exitoso con este tipo; el clic se cuenta con ?n=<tipo> en la URL.",
+      "enum": [
+        "recomendacion_dia"
+      ]
+    },
     "destinatario": {
       "type": "integer",
       "minimum": 1

@@ -27,7 +27,7 @@ Los valores son de ejemplo; los secretos solo por entorno. Si falta alguna oblig
 | `NOTIF_TITULO_TEMPLATE` | `Tu recomendación de hoy: {titulo}` | Variables: `titulo`, `modulo`. |
 | `NOTIF_CUERPO_TEMPLATE` | `Hoy te recomendamos {que_es}: {titulo}. Mirala acá: {url}` | Variables: `titulo`, `modulo`, `que_es`, `url`. |
 | `NOTIF_CUERPO_PUSH_TEMPLATE` | `Hoy te recomendamos {que_es}: {titulo}.` | Cuerpo del aviso push (el link va en `url`). Variables: `titulo`, `modulo`, `que_es`. |
-| `NOTIF_URL_TEMPLATE` | `https://recome.example/catalogo/{item_id}` | Debe apuntar al dominio real del frontend (ruta `/catalogo/:itemId`). |
+| `NOTIF_URL_TEMPLATE` | `https://recome.example/catalogo/{item_id}` | Debe apuntar al dominio real del frontend (ruta `/catalogo/:itemId`). El worker le agrega `?n=recomendacion_dia` (en el push y en el mail) para que el frontend cuente el clic en las analytics del admin; no hace falta ponerlo en la plantilla. |
 | `SHUTDOWN_TIMEOUT_S` | `25` | Plazo de apagado. |
 | `SUMMARY_INTERVAL_S` | `60` | Período del resumen de contadores. |
 | `LOG_LEVEL` | `INFO` | |

@@ -14,6 +14,7 @@ from recos_auto.worker.notificacion import (
     Contenido,
     Notificacion,
     armar_notificacion,
+    con_origen,
     id_mensaje_para,
 )
 from recos_auto.worker.recomendaciones import PushKeys, PushSub, Recomendacion
@@ -131,7 +132,7 @@ def test_plantillas_configurables():
     )
     n = armar_notificacion(_mensaje(), _rec(), cfg)
     assert n.contenido.titulo == "Hoy: Matrix (película)"
-    assert n.contenido.cuerpo == f"una película -> https://x.test/peliculas/{uuid.UUID(int=99)}"
+    assert n.contenido.cuerpo == f"una película -> https://x.test/peliculas/{uuid.UUID(int=99)}?n=recomendacion_dia"
 
 
 def test_notificacion_valida_contra_el_schema():
@@ -210,7 +211,31 @@ def test_sin_suscripcion_push_el_aviso_sigue_siendo_mail():
 
 def test_el_link_usa_el_id_del_catalogo_cuando_api_general_lo_manda():
     n = armar_notificacion(_mensaje(), _rec_push(catalog_item_id=1234), _cfg())
-    assert n.contenido.url == "https://recome.example/catalogo/1234"
+    assert n.contenido.url == "https://recome.example/catalogo/1234?n=recomendacion_dia"
+
+
+def test_la_notificacion_lleva_el_tipo_para_las_analytics():
+    assert armar_notificacion(_mensaje(), _rec(), _cfg()).tipo == "recomendacion_dia"
+    assert armar_notificacion(_mensaje(), _rec_push(), _cfg()).model_dump(mode="json")["tipo"] == "recomendacion_dia"
+
+
+def test_el_link_del_mail_tambien_cuenta_el_clic():
+    n = armar_notificacion(_mensaje(), _rec(), _cfg())
+    assert "?n=recomendacion_dia" in n.contenido.cuerpo
+
+
+@pytest.mark.parametrize(
+    ("url", "esperada"),
+    [
+        ("https://x.test/catalogo/1", "https://x.test/catalogo/1?n=recomendacion_dia"),
+        ("https://x.test/c?tipo=juegos", "https://x.test/c?tipo=juegos&n=recomendacion_dia"),
+        ("https://x.test/c?n=otro&a=1", "https://x.test/c?a=1&n=recomendacion_dia"),
+        ("https://x.test/c#detalle", "https://x.test/c?n=recomendacion_dia#detalle"),
+        ("/catalogo/1", "/catalogo/1?n=recomendacion_dia"),
+    ],
+)
+def test_con_origen_conserva_la_consulta_y_el_fragmento(url, esperada):
+    assert con_origen(url, "recomendacion_dia") == esperada
 
 
 def test_notificacion_push_valida_contra_el_schema():
